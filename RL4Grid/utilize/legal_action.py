@@ -1,6 +1,6 @@
 import numpy as np
 
-from utilize.exceptions.action_illegal_exceptions import *
+from ..utilize.exceptions.action_illegal_exceptions import *
 
 
 def check_gen_p(adjust_gen_p, action_space_gen_p, gen_ids, eps):

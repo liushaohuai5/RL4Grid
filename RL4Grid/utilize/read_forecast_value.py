@@ -3,10 +3,10 @@ import numpy as np
 
 class ForecastReader(object):
     def __init__(self, ppc, is_test=False):
-        max_renewable_gen_p_filepath = f'data/{"test" if is_test else "train"}/{ppc["network"]}/max_renewable_gen_p.csv'
+        max_renewable_gen_p_filepath = f'RL4Grid/data/{"test" if is_test else "train"}/{ppc["network"]}/max_renewable_gen_p.csv'
         def_max_renewable_gen_p = pd.read_csv(max_renewable_gen_p_filepath)
         self.max_renewable_gen_p_all = def_max_renewable_gen_p.values.tolist()
-        load_p_filepath = f'data/{"test" if is_test else "train"}/{ppc["network"]}/load_p.csv'
+        load_p_filepath = f'RL4Grid/data/{"test" if is_test else "train"}/{ppc["network"]}/load_p.csv'
         def_load_p = pd.read_csv(load_p_filepath)
         self.load_p_all = def_load_p.values.tolist()
         self.ppc = ppc

@@ -1,10 +1,10 @@
 import sys
-from observation import Observation
-from rewards import *
-from utilize.read_forecast_value import ForecastReader
-from utilize.line_cutting import Disconnect
-from utilize.action_space import ActionSpace
-from utilize.legal_action import *
+from .observation import Observation
+from .rewards import *
+from .utilize.read_forecast_value import ForecastReader
+from .utilize.line_cutting import Disconnect
+from .utilize.action_space import ActionSpace
+from .utilize.legal_action import *
 import copy
 import numpy as np
 import pandas as pd
@@ -57,8 +57,8 @@ class Environment:
         self.is_test = is_test
         self.two_player = two_player
         self.attack_all = attack_all
-        self.load_p_filepath = f'data/{"test" if is_test else "train"}/{network}/load_p.csv'
-        self.load_q_filepath = f'data/{"test" if is_test else "train"}/{network}/load_q.csv'
+        self.load_p_filepath = f'RL4Grid/data/{"test" if is_test else "train"}/{network}/load_p.csv'
+        self.load_q_filepath = f'RL4Grid/data/{"test" if is_test else "train"}/{network}/load_q.csv'
         self.load_bus = np.nonzero(self.ppc['bus'][:, PD])[0].tolist()
 
         self.load_p_profiles = pd.read_csv(self.load_p_filepath).values
