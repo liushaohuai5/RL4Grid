@@ -237,8 +237,7 @@ def case57():
     for i, bus in enumerate(ppc['gen'][:, GEN_BUS].tolist()):
         bus_idx = ppc['bus'][:, BUS_I].tolist().index(bus)
         if ppc['bus'][bus_idx, BUS_TYPE] not in [2, 3]:
-            import ipdb
-            ipdb.set_trace()
+            print('there is a pQ gen')
         ppc['bus'][bus_idx, BUS_TYPE] = 3 if i == ppc['balanced_id'] else 2
     ppc['min_gen_q'] = ppc['gen'][:, QMIN]
     ppc['max_gen_q'] = ppc['gen'][:, QMAX]

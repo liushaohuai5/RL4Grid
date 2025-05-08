@@ -17,7 +17,6 @@ from pypower.idx_brch import *
 from pypower.idx_cost import *
 from pypower.ppoption import ppoption
 from pypower.opf import opf
-import ipdb
 from numpy import flatnonzero as find
 from pypower.isload import isload
 from pypower.totcost import totcost
@@ -529,8 +528,7 @@ class Environment:
             future_load_p=future_load_p
         )
         if sum(self.obs.gen_p[self.ppc['renewable_ids']]) - sum(self.obs.curstep_renewable_gen_p_max) > 1.0:
-            import ipdb
-            ipdb.set_trace()
+            print('renewable exceeds')
         self.reward = self.get_reward(self.obs, last_obs)
         return self.return_res()
 
@@ -680,14 +678,10 @@ class Environment:
         for i in self.ppc['thermal_ids']:
             # if self.ppc['gen'][i, GEN_STATUS] == 0 and self.gen_start_flag[i] == 0:
             if self.ppc['gen'][i, GEN_STATUS] == 0:
-                if abs(rounded_gen_p[i]) > 1e-3:
-                    import ipdb
-                    ipdb.set_trace()
                 assert abs(rounded_gen_p[i]) < 1e-3
             else:
                 if rounded_gen_p[i] < self.ppc['min_gen_p'][i] - 1e-3:
-                    import ipdb
-                    ipdb.set_trace()
+                    print('opened gen < min_gen_p')
                 assert rounded_gen_p[i] >= self.ppc['min_gen_p'][i] - 1e-3, (i, rounded_gen_p[i], self.ppc['min_gen_p'][i])
 
             assert abs(injection_gen_p[i] - rounded_gen_p[i]) <= self.ppc['env_allow_precision'], (i, injection_gen_p[i], rounded_gen_p[i])

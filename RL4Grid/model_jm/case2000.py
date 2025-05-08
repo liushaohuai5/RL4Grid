@@ -75,8 +75,6 @@ def case2000():
         bus_idx = ppc['bus'][:, BUS_I].tolist().index(bus)
         if int(ppc['bus'][bus_idx, BUS_TYPE]) not in [2, 3]:
             ppc['bus'][bus_idx, BUS_TYPE] = 2
-            # import ipdb
-            # ipdb.set_trace()
         ppc['bus'][bus_idx, BUS_TYPE] = 3 if i == ppc['balanced_id'] else 2
 
     # ppc['gen'][:, QMIN] *= 10
