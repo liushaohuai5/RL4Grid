@@ -1,6 +1,7 @@
 # RL4Grid Environment
 
-A fully open-sourced reinforcement learning environment, designed for power system optimal dispatch problem. Underlying power flow simulation is based on Pypower.
+A fully open-sourced reinforcement learning environment, designed for power system optimal dispatch problem. 
+Underlying power flow simulation is based on [PyPower](https://github.com/rwl/PYPOWER/tree/master).
 
 ## Features
 
