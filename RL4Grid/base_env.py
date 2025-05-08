@@ -282,7 +282,7 @@ class Environment:
             future_renewable_gen_p_max=future_renewable_gen_p_max,
             future_load_p=future_load_p
         )
-        print(f'PD={sum(self.ppc["bus"][:, PD])}, PG_after_reset={sum(self.ppc["gen"][:, PG])}, result_PG={sum(self.ppc["gen"][:, PG])}')
+        # print(f'PD={sum(self.ppc["bus"][:, PD])}, PG_after_reset={sum(self.ppc["gen"][:, PG])}, result_PG={sum(self.ppc["gen"][:, PG])}')
         return copy.deepcopy(self.obs)
 
     def load_and_step(self, snapshot, act):
