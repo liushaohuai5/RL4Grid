@@ -1,11 +1,12 @@
 # RL4Grid Environment
 
-This is a custom reinforcement learning environment, designed for power system optimal dispatch problem.
+A fully open-sourced reinforcement learning environment, designed for power system optimal dispatch problem. Underlying power flow simulation is based on Pypower.
 
 ## Features
 
-- action: generator active power setpoints
-- networks: IEEE 14, 39, 57, 300 systems and SG126
+- General actions: continuous generator active power adjustments
+- Adversarial actions: discrete transmission line attack choices (Not available yet)
+- Networks: IEEE14, 39, 57, 300 systems and a 126 system (modified from IEEE118)
 
 ## Installation
 
@@ -14,7 +15,7 @@ This is a custom reinforcement learning environment, designed for power system o
 You can install the environment package using `pip`:
 
 ```bash
-pip install RL4Grid
+pip install git+https://github.com/liushaohuai5/RL4Grid.git
 ```
 
 ## Usage Example
@@ -26,7 +27,7 @@ import gym
 import RL4Grid  # Import your environment
 
 # Create the environment
-env = gym.make("MyRL-v0")
+env = RL4Grid.make_gridsim('IEEE14')
 
 # Reset the environment
 env.reset()
@@ -45,11 +46,11 @@ for _ in range(10):
 ## Data
 Download data at https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi%3A10.7910%2FDVN%2F01JJZY&version=DRAFT#
 
-Extract and put data/ at RL4Grid/RL4Grid/
+Extract and put data/ at the python package location RL4Grid/data/
 
 
 ## Test
 ```bash
-cd RL4Grid/RL4Grid
+cd RL4Grid/
 python test.py
 ```
