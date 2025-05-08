@@ -21,6 +21,7 @@ from numpy import flatnonzero as find
 from pypower.isload import isload
 from pypower.totcost import totcost
 import random
+import os
 warnings.filterwarnings('ignore')
 
 class Environment:
@@ -56,8 +57,9 @@ class Environment:
         self.is_test = is_test
         self.two_player = two_player
         self.attack_all = attack_all
-        self.load_p_filepath = f'RL4Grid/data/{"test" if is_test else "train"}/{network}/load_p.csv'
-        self.load_q_filepath = f'RL4Grid/data/{"test" if is_test else "train"}/{network}/load_q.csv'
+        root_path = os.path.dirname(os.path.abspath(__file__))
+        self.load_p_filepath = root_path + f'/data/{"test" if is_test else "train"}/{network}/load_p.csv'
+        self.load_q_filepath = root_path + f'/data/{"test" if is_test else "train"}/{network}/load_q.csv'
         self.load_bus = np.nonzero(self.ppc['bus'][:, PD])[0].tolist()
 
         self.load_p_profiles = pd.read_csv(self.load_p_filepath).values
