@@ -23,7 +23,7 @@ Once installed, you can use the reinforcement learning environment as follows:
 ```python
 
 import gym
-import my_rl_env  # Import your environment
+import RL4Grid  # Import your environment
 
 # Create the environment
 env = gym.make("MyRL-v0")
