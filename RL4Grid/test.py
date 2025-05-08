@@ -1,4 +1,4 @@
-from game.gridsim import make_gridsim
+from RL4Grid import make_gridsim
 from utilize.form_action import form_action
 import numpy as np
 
