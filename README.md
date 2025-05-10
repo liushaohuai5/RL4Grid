@@ -44,6 +44,12 @@ for _ in range(10):
         
 ```
 
+## Modifying Pypower
+Copy casefiles to pypower path
+```bash
+cp model_jm/case* [pypower_package_path]
+```
+
 ## Data
 Download data at https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi%3A10.7910%2FDVN%2F01JJZY&version=DRAFT#
 
