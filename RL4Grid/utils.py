@@ -559,21 +559,21 @@ def bus_to_line_matrix(ppc):
         bus2lineM[tbus, i] = -1
     return bus2lineM
 
-def gen_to_bus_influence_matrix(obs, ppc):
-    adjacent_matrix = get_adjacent_matrix(obs, ppc)
-    gen2busM = gen_to_bus_matrix(ppc)
-    gen2busInfM = gen2busM + 0.3 * np.matmul(gen2busM, adjacent_matrix)
-    return gen2busInfM
-
-def gen_to_line_influence_matrix(obs, ppc):
-    adjacent_matrix = get_adjacent_matrix(obs, ppc)
-    gen2busM = gen_to_bus_matrix(ppc)
-    bus2lineM = bus_to_line_matrix(ppc)
-    SecondOrderA = np.matmul(adjacent_matrix, adjacent_matrix)
-    ThirdOrderA = np.matmul(adjacent_matrix, np.matmul(adjacent_matrix, adjacent_matrix))
-    temp = gen2busM \
-           + 0.3*(np.matmul(gen2busM, adjacent_matrix)) \
-           # + 0.1*(np.matmul(gen2busM, SecondOrderA)) \
-           # + 0.03*(np.matmul(gen2busM, ThirdOrderA))
-    gen2lineInfM = np.matmul(temp, bus2lineM)
-    return gen2lineInfM
+# def gen_to_bus_influence_matrix(obs, ppc):
+#     adjacent_matrix = get_adjacent_matrix(obs, ppc)
+#     gen2busM = gen_to_bus_matrix(ppc)
+#     gen2busInfM = gen2busM + 0.3 * np.matmul(gen2busM, adjacent_matrix)
+#     return gen2busInfM
+#
+# def gen_to_line_influence_matrix(obs, ppc):
+#     adjacent_matrix = get_adjacent_matrix(obs, ppc)
+#     gen2busM = gen_to_bus_matrix(ppc)
+#     bus2lineM = bus_to_line_matrix(ppc)
+#     SecondOrderA = np.matmul(adjacent_matrix, adjacent_matrix)
+#     ThirdOrderA = np.matmul(adjacent_matrix, np.matmul(adjacent_matrix, adjacent_matrix))
+#     temp = gen2busM \
+#            + 0.3*(np.matmul(gen2busM, adjacent_matrix)) \
+#            # + 0.1*(np.matmul(gen2busM, SecondOrderA)) \
+#            # + 0.03*(np.matmul(gen2busM, ThirdOrderA))
+#     gen2lineInfM = np.matmul(temp, bus2lineM)
+#     return gen2lineInfM

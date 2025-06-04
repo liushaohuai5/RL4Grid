@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "gym==0.17.1",
-        "numpy==1.21.0",
+        "numpy==1.23.0",
         "pypower",
     ],
     author="Shaohuai Liu",

@@ -229,6 +229,10 @@ def case39():
     ppc['num_gen'] = ppc['gen'].shape[0]
     ppc['num_bus'] = ppc['bus'].shape[0]
     ppc['num_line'] = ppc['branch'].shape[0]
+    ppc['gen_bus'] = []
+    for bus in ppc['gen'][:, GEN_BUS].tolist():
+        idx = ppc['bus'][:, BUS_I].tolist().index(bus)
+        ppc['gen_bus'].append(idx)
     ppc['load_bus'] = np.nonzero(ppc['bus'][:, PD])[0].tolist()
     ppc['num_load'] = len(ppc['load_bus'])
     ppc['gen_type'] = [0 for _ in range(ppc['num_gen'])]

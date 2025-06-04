@@ -28,7 +28,7 @@ def case2000():
     # bus, Pg, Qg, Qmax, Qmin, Vg, mBase, status, Pmax, Pmin, Pc1, Pc2,
     # Qc1min, Qc1max, Qc2min, Qc2max, ramp_agc, ramp_10, ramp_30, ramp_q, apf
     ppc["gen"] = np.load(path+'TX2000_gen.npy')
-    ppc["gen"][39, GEN_BUS] = 1091
+    # ppc["gen"][39, GEN_BUS] = 1091
 
 
     ## branch data
@@ -49,14 +49,20 @@ def case2000():
     # ppc['branch'][:, ANGMIN] = -360.0
     # ppc['branch'][:, ANGMAX] = 360.0
     # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(1e3, 1e8)
+    ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = 10000.0
+    ppc['gencost'][:, 4] += 0.001
 
     ppc['network'] = 'Texas2000'
     ppc['num_gen'] = ppc['gen'].shape[0]
     ppc['num_bus'] = ppc['bus'].shape[0]
     ppc['num_line'] = ppc['branch'].shape[0]  # 185 ori
+    ppc['gen_bus'] = []
+    for bus in ppc['gen'][:, GEN_BUS].tolist():
+        idx = ppc['bus'][:, BUS_I].tolist().index(bus)
+        ppc['gen_bus'].append(idx)
     ppc['load_bus'] = np.nonzero(ppc['bus'][:, PD])[0].tolist()
     ppc['num_load'] = len(ppc['load_bus'])
-    ppc['gen_type'] = np.load(path+'TX2000_gen_type.npy')
+    ppc['gen_type'] = np.load(path+'TX2000_gen_type.npy')[:ppc['num_gen']]
     balanced_bus = ppc['bus'][np.where(ppc['bus'][:, BUS_TYPE] == 3)[0][0], BUS_I]
     ppc['balanced_id'] = np.where(ppc['gen'][:, GEN_BUS] == balanced_bus)[0][0]
     ppc['gen_type'][ppc['balanced_id']] = 2
@@ -66,11 +72,11 @@ def case2000():
     # ppc['gencost'][ppc['renewable_ids'], -1] = 0
     ppc['sorted_controlable_ids'] = sorted(ppc['renewable_ids'] + ppc['thermal_ids'])
     ppc['min_gen_p'] = ppc['gen'][:, PMIN].tolist()
-    ppc['gen'][ppc['balanced_id'], PMAX] *= 5
+    # ppc['gen'][ppc['balanced_id'], PMAX] *= 5
     ppc['max_gen_p'] = ppc['gen'][:, PMAX].tolist()
     for i in range(ppc['num_gen']):
         if i in ppc['thermal_ids']:
-            ppc['min_gen_p'][i] = np.around(0.04 * ppc['gen'][i, PMAX], decimals=2).tolist()
+            ppc['min_gen_p'][i] = np.around(0.4 * ppc['gen'][i, PMAX], decimals=2).tolist()
     for i, bus in enumerate(ppc['gen'][:, GEN_BUS].tolist()):
         bus_idx = ppc['bus'][:, BUS_I].tolist().index(bus)
         if int(ppc['bus'][bus_idx, BUS_TYPE]) not in [2, 3]:

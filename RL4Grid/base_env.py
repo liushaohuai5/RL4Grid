@@ -42,6 +42,10 @@ class Environment:
             self.ppc = case300()
         elif self.network == 'Texas2000':
             self.ppc = case2000()
+            # import ipdb
+            # ipdb.set_trace()
+            # ppopt = ppoption(VERBOSE=0, OUT_ALL=1)
+            # result = runopf(self.ppc, ppopt)
         else:
             raise NotImplementedError('Available grids are IEEE14, 39, 57, 300; SG126.')
 
@@ -154,8 +158,35 @@ class Environment:
             print('restarting generator %d.\n' % i)
 
         ## run initial opf
+        # import ipdb
+        # ipdb.set_trace()
+        # new_ppc = {}
+        # new_ppc['bus'] = self.ppc['bus']
+        # new_ppc['gen'] = self.ppc['gen']
+        #
+        # def convert(obj):
+        #     if isinstance(obj, np.ndarray):
+        #         return obj.tolist()
+        #     raise TypeError(f"Type {type(obj)} not serializable")
+        #
+        # import json
+        # json_str = json.dumps(new_ppc, default=convert)
+        # with open('texas2000_ppc.json', 'w') as f:
+        #     f.write(json_str)
+
         ppopt = ppoption(VERBOSE=0, OUT_ALL=1)
-        self.ppc = runopf(self.ppc, ppopt)
+        import ipdb
+        ipdb.set_trace()
+        result = rundcopf(self.ppc, ppopt)
+        import ipdb
+        ipdb.set_trace()
+        # if result['raw']['output']['message'] == 'Numerically failed':
+        if result['success'] == False:
+            import ipdb
+            ipdb.set_trace()
+            result = rundcopf(self.ppc, ppopt)
+        self.ppc = result
+
 
     def rerun_opf(self, nextstep_renewable_gen_p_max):
         # GEN_DATA
@@ -165,23 +196,23 @@ class Environment:
         self.ppc['gen'][:, PMAX] = np.array(self.ppc['max_gen_p'])
         redundancy = (self.ppc['max_gen_p'][self.ppc['balanced_id']] - self.ppc['min_gen_p'][self.ppc['balanced_id']]) / 2 * 0.8
         self.ppc['gen'][self.ppc['balanced_id'], PMAX] = bal_gen_p_mid + redundancy
-        self.ppc['gen'][self.ppc['renewable_ids'], PMAX] = np.array(nextstep_renewable_gen_p_max) * 0.5
+        # self.ppc['gen'][self.ppc['renewable_ids'], PMAX] = np.array(nextstep_renewable_gen_p_max) * 0.8
         # self.ppc['gen'][self.ppc['renewable_ids'], GEN_STATUS] = 1
         self.ppc['gen'][:, PMIN] = np.array(self.ppc['min_gen_p'])
         self.ppc['gen'][self.ppc['balanced_id'], PMIN] = bal_gen_p_mid - redundancy
 
-        self.ppc['bus'][:, VM] = 1.0
-        self.ppc['bus'][:, VA] = 0.0
-        self.ppc['gen'][:, VG] = 1.05
-        for idx in self.ppc['gen'][:, GEN_BUS].astype(int).tolist():
-            i = self.ppc['bus'][:, BUS_I].astype(int).tolist().index(idx)
-            self.ppc['bus'][i, VM] = 1.05
+        # self.ppc['bus'][:, VM] = 1.0
+        # self.ppc['bus'][:, VA] = 0.0
+        # self.ppc['gen'][:, VG] = 1.05
+        # for idx in self.ppc['gen'][:, GEN_BUS].astype(int).tolist():
+        #     i = self.ppc['bus'][:, BUS_I].astype(int).tolist().index(idx)
+        #     self.ppc['bus'][i, VM] = 1.05
 
         for i in self.ppc['thermal_ids']:
-            if random.random() < 0.6:
-                self.ppc['gen'][i, GEN_STATUS] = 1
-            else:
-                self.ppc['gen'][i, [GEN_STATUS, PMIN, PMAX]] = 0.0
+            # if random.random() < 0.6:s
+            self.ppc['gen'][i, GEN_STATUS] = 1
+            # else:
+            #     self.ppc['gen'][i, [GEN_STATUS, PMIN, PMAX]] = 0.0
 
         self.run_uopf()
         # print(f'lower than min={np.where(self.ppc["gen"][:, PG]<self.ppc["gen"][:, PMIN])}')
@@ -194,11 +225,14 @@ class Environment:
         self.ppc['gen'][self.ppc['renewable_ids'], PMIN] = self.ppc['gen'][self.ppc['renewable_ids'], PG]
         self.ppc['gen'][self.ppc['thermal_ids'], PMAX] = self.ppc['gen'][self.ppc['thermal_ids'], PG]
         self.ppc['gen'][self.ppc['thermal_ids'], PMIN] = self.ppc['gen'][self.ppc['thermal_ids'], PG]
-        diff_p = sum(self.ppc['bus'][:, PD]) - sum(self.ppc['gen'][:, PG])
-        if abs(diff_p) > 100:
-            self.ppc['gen'][self.ppc['balanced_id'], PG] += diff_p
-        if self.ppc['gen'][self.ppc["balanced_id"], PG] > self.ppc["max_gen_p"][self.ppc["balanced_id"]]:
-            return self.ppc, False, f'balanced_gen_p out of limit {self.ppc["gen"][self.ppc["balanced_id"], PG]}'
+        # diff_p = sum(self.ppc['bus'][:, PD]) - sum(self.ppc['gen'][:, PG])
+        # import ipdb
+        # ipdb.set_trace()
+        # if abs(diff_p) > 100:
+        #     self.ppc['gen'][self.ppc['balanced_id'], PG] += diff_p
+        if self.ppc['gen'][self.ppc["balanced_id"], PG] > self.ppc["max_gen_p"][self.ppc["balanced_id"]] or \
+                self.ppc['gen'][self.ppc['balanced_id'], PG] < self.ppc['min_gen_p'][self.ppc['balanced_id']]:
+            return False, f'balanced_gen_p out of limit {self.ppc["gen"][self.ppc["balanced_id"], PG]}'
         self.ppc['gen'][self.ppc["balanced_id"], PMAX] = self.ppc['gen'][self.ppc["balanced_id"], PG]
         self.ppc['gen'][self.ppc["balanced_id"], PMIN] = self.ppc['gen'][self.ppc["balanced_id"], PG]
         self.ppc, success = runpf(self.ppc, self.ppopt)
@@ -241,12 +275,14 @@ class Environment:
 
         # Read self.sample_idx timestep data
         self.readdata(self.sample_idx)
+        print(f'gen_p_2={self.ppc["gen"][:, PG].sum()}, load_p_2={self.ppc["bus"][:, PD].sum()}, sample_idx={self.sample_idx}')
 
         # Update forecast value
         curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max = \
             self.forecast_reader.read_step_renewable_gen_p_max(self.sample_idx)
 
         self.rerun_opf(nextstep_renewable_gen_p_max)
+        print(f'gen_p_2.5={self.ppc["gen"][:, PG].sum()}, load_p_2.5={self.ppc["bus"][:, PD].sum()}')
         rounded_gen_p = self._round_p(self.ppc['gen'][:, PG])
         self._update_gen_status(self.ppc['gen'][:, PG], is_reset=True)
         self._check_gen_status(self.ppc['gen'][:, PG], rounded_gen_p)
@@ -455,6 +491,7 @@ class Environment:
         # Compute the injection action
         self.ppc['gen'][:, PG] += act['adjust_gen_p']   # actual power adjustion
         # self.ppc['gen'][:, VG] += act['adjust_gen_v']   # generator voltage adjust
+        print(f'gen_p_3={self.ppc["gen"][:, PG].sum()}, load_p_3={self.ppc["bus"][:, PD].sum()}')
 
         # Check the legality of the action
         legal_flag, fail_info = is_legal(act, last_obs, self.ppc)
@@ -491,7 +528,7 @@ class Environment:
             return self.return_res(info, self.done)
 
         rounded_gen_p = self._round_p(self.ppc['gen'][:, PG])
-
+        print(f'gen_p_4={self.ppc["gen"][:, PG].sum()}, load_p_4={self.ppc["bus"][:, PD].sum()}')
         self._check_gen_status(self.ppc['gen'][:, PG], rounded_gen_p)
         self.last_injection_gen_p = copy.deepcopy(self.ppc['gen'][:, PG])
 
@@ -680,7 +717,7 @@ class Environment:
         for i in self.ppc['thermal_ids']:
             # if self.ppc['gen'][i, GEN_STATUS] == 0 and self.gen_start_flag[i] == 0:
             if self.ppc['gen'][i, GEN_STATUS] == 0:
-                assert abs(rounded_gen_p[i]) < 1e-3
+                assert abs(rounded_gen_p[i]) < 1e-3, (i, rounded_gen_p[i], self.ppc['min_gen_p'][i])
             else:
                 if rounded_gen_p[i] < self.ppc['min_gen_p'][i] - 1e-3:
                     print('opened gen < min_gen_p')

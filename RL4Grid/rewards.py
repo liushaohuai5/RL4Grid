@@ -21,7 +21,9 @@ def renewable_consumption_reward(obs, ppc):
     for i, j in enumerate(ppc['renewable_ids']):
         all_gen_p += obs.gen_p[j]
         all_gen_p_max += obs.curstep_renewable_gen_p_max[i]
-    r = all_gen_p / all_gen_p_max
+    r = all_gen_p / (all_gen_p_max + 1e-3)
+    if all_gen_p_max == 0.0:
+        r = 1.0
     return r
 
 def thermal_backup_reward(obs, ppc):

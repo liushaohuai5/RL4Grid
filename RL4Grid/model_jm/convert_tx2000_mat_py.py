@@ -1,6 +1,6 @@
 import numpy as np
 
-with open("C:/Users/sh-li/Downloads/case_ACTIVSg2000.m", "r", encoding="utf-8") as file:
+with open("C:/Users/sh-li/Downloads/case_ACTIVSg2000 (2).m", "r", encoding="utf-8") as file:
     line = file.readline()
     bus_array = []
     gen_array = []
@@ -8,17 +8,18 @@ with open("C:/Users/sh-li/Downloads/case_ACTIVSg2000.m", "r", encoding="utf-8") 
     gencost_array = []
     while line:
         if 'mpc.bus =' in line:
-            import ipdb
-            ipdb.set_trace()
             line = file.readline()
             while '];' not in line:
+                # if '3147' in line:
+                #     import ipdb
+                #     ipdb.set_trace()
                 floats = line.split(';\n')[0].split('\t')[1:]
                 floats = [float(f) for f in floats]
                 bus_array.append(floats)
                 line = file.readline()
         elif 'mpc.gen =' in line:
-            import ipdb
-            ipdb.set_trace()
+            # import ipdb
+            # ipdb.set_trace()
             line = file.readline()
             while '];' not in line:
                 floats = line.split(';\n')[0].split('\t')[1:]
@@ -26,8 +27,8 @@ with open("C:/Users/sh-li/Downloads/case_ACTIVSg2000.m", "r", encoding="utf-8") 
                 gen_array.append(floats)
                 line = file.readline()
         elif 'mpc.branch =' in line:
-            import ipdb
-            ipdb.set_trace()
+            # import ipdb
+            # ipdb.set_trace()
             line = file.readline()
             while '];' not in line:
                 floats = line.split(';\n')[0].split('\t')[1:]
@@ -46,10 +47,10 @@ with open("C:/Users/sh-li/Downloads/case_ACTIVSg2000.m", "r", encoding="utf-8") 
     import ipdb
     ipdb.set_trace()
     bus_array = np.asarray(bus_array)
-    np.save("C:/Users/sh-li/Downloads/AdversarialGridZero/model_jm/TX2000_bus.npy", bus_array)
+    np.save("C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/model_jm/TX2000_bus.npy", bus_array)
     gen_array = np.asarray(gen_array)
-    np.save("C:/Users/sh-li/Downloads/AdversarialGridZero/model_jm/TX2000_gen.npy", gen_array)
+    np.save("C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/model_jm/TX2000_gen.npy", gen_array)
     branch_array = np.asarray(branch_array)
-    np.save("C:/Users/sh-li/Downloads/AdversarialGridZero/model_jm/TX2000_branch.npy", branch_array)
+    np.save("C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/model_jm/TX2000_branch.npy", branch_array)
     gencost_array = np.asarray(gencost_array)
-    np.save("C:/Users/sh-li/Downloads/AdversarialGridZero/model_jm/TX2000_gencost.npy", gencost_array)
+    np.save("C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/model_jm/TX2000_gencost.npy", gencost_array)
