@@ -41,16 +41,18 @@ def case2000():
     # 2 startup shutdown n c(n-1) ... c0
     ppc["gencost"] = np.load(path+'TX2000_gencost.npy')
 
-    ppc['bus'][:, BUS_AREA] = 1
+    # ppc['bus'][:, BUS_AREA] = 1
     # ppc['branch'][:, [BR_R, BR_X, BR_B]] = np.abs(ppc['branch'][:, [BR_R, BR_X, BR_B]])
-    # ppc['branch'][:, BR_X] /= 10
+    # ppc['branch'][:, BR_X] += 0.1
     # ppc['branch'][:, [BR_R, BR_X]] = ppc['branch'][:, [BR_R, BR_X]].clip(1e-3, 1000)
     # ppc['branch'][:, BR_B] /= 10
     # ppc['branch'][:, ANGMIN] = -360.0
     # ppc['branch'][:, ANGMAX] = 360.0
-    # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(1e3, 1e8)
-    ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = 10000.0
-    ppc['gencost'][:, 4] += 0.001
+    ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(1e2, 1e8)
+    # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = 10000.0
+    # ppc['gencost'][:, 4] += 0.001
+    # overload_lines = [438]
+    # ppc['branch'][overload_lines, [RATE_A]] *= 5
 
     ppc['network'] = 'Texas2000'
     ppc['num_gen'] = ppc['gen'].shape[0]
@@ -77,6 +79,7 @@ def case2000():
     for i in range(ppc['num_gen']):
         if i in ppc['thermal_ids']:
             ppc['min_gen_p'][i] = np.around(0.4 * ppc['gen'][i, PMAX], decimals=2).tolist()
+            ppc['gen'][i, PMIN] = ppc['min_gen_p'][i]
     for i, bus in enumerate(ppc['gen'][:, GEN_BUS].tolist()):
         bus_idx = ppc['bus'][:, BUS_I].tolist().index(bus)
         if int(ppc['bus'][bus_idx, BUS_TYPE]) not in [2, 3]:
