@@ -1,4 +1,6 @@
 import sys
+import time
+
 from .observation import Observation
 from .rewards import *
 from .utilize.read_forecast_value import ForecastReader
@@ -23,6 +25,7 @@ from pypower.totcost import totcost
 import random
 import os
 warnings.filterwarnings('ignore')
+from .model_jm.visualizer import Visualizer
 
 class Environment:
     '''
@@ -42,19 +45,19 @@ class Environment:
             self.ppc = case300()
         elif self.network == 'Texas2000':
             self.ppc = case2000()
-            # import ipdb
-            # ipdb.set_trace()
-            # ppopt = ppoption(VERBOSE=0, OUT_ALL=1)
-            # result = runopf(self.ppc, ppopt)
+        elif self.network == 'Western10000':
+            self.ppc = case10000()
         else:
-            raise NotImplementedError('Available grids are IEEE14, 39, 57, 300; SG126.')
+            raise NotImplementedError('Available grids are IEEE14, 39, 57, 300; Synthetic grids are SG126, Texas2000, Western10000')
+
+        if self.network in ['Texas2000', 'Western10000']:
+            self.visualizer = Visualizer(self.ppc)
 
         self.num_gen = self.ppc['gen'].shape[0]
         self.num_bus = self.ppc['bus'].shape[0]
         self.num_line = self.ppc['branch'].shape[0]
-        self.ppopt = ppoption(PF_DC=False, VERBOSE=0,)
+        self.ppopt = ppoption(PF_DC=False, VERBOSE=0, OUT_ALL=0)
 
-        self.forecast_reader = ForecastReader(self.ppc, is_test=is_test)
         self.reward_type = reward_type
         self.done = True
         self.action_space_cls = ActionSpace(self.ppc)
@@ -62,12 +65,26 @@ class Environment:
         self.two_player = two_player
         self.attack_all = attack_all
         root_path = os.path.dirname(os.path.abspath(__file__))
-        self.load_p_filepath = root_path + f'/data/{"test" if is_test else "train"}/{network}/load_p.csv'
-        self.load_q_filepath = root_path + f'/data/{"test" if is_test else "train"}/{network}/load_q.csv'
+        # self.load_p_filepath = root_path + f'/data/{"test" if is_test else "train"}/{network}/load_p.csv'
+        # self.load_q_filepath = root_path + f'/data/{"test" if is_test else "train"}/{network}/load_q.csv'
         self.load_bus = np.nonzero(self.ppc['bus'][:, PD])[0].tolist()
 
-        self.load_p_profiles = pd.read_csv(self.load_p_filepath).values
-        self.load_q_profiles = pd.read_csv(self.load_q_filepath).values
+        # self.load_p_profiles = pd.read_csv(self.load_p_filepath).values
+        # self.load_q_profiles = pd.read_csv(self.load_q_filepath).values
+        self.load_path = root_path + f'/data/{"test" if is_test else "train"}/load.npy'
+        self.load_profiles = np.load(self.load_path)
+        self.solar_path = root_path + f'/data/{"test" if is_test else "train"}/solar.npy'
+        self.solar_profiles = np.load(self.solar_path)
+        self.wind_path = root_path + f'/data/{"test" if is_test else "train"}/wind.npy'
+        self.wind_profiles = np.load(self.wind_path)
+        self.bus_areas = random.sample(list(range(self.load_profiles.shape[1])), int(self.ppc['bus'][:, BUS_AREA].max()))
+        self.bus_areas = np.asarray([self.bus_areas[int(i)-1] for i in self.ppc['bus'][:, BUS_AREA].tolist()])
+        self.ori_ppc = copy.deepcopy(self.ppc)
+        self.renewable_masks = np.asarray([int(random.random() > 0.5) for _ in range(len(self.ppc['renewable_ids']))])     # 0-solar, 1-wind
+        self.last_load_noises = np.ones(self.ppc['num_bus'])[self.load_bus]
+        self.last_renewable_noises = np.ones(len(self.ppc['renewable_ids']))
+
+        self.forecast_reader = ForecastReader(self.ppc, self.bus_areas, self.renewable_masks, is_test=is_test)
 
 
     def reset_attr(self):
@@ -91,12 +108,20 @@ class Environment:
             self.ppc = case300()
         elif self.network == 'Texas2000':
             self.ppc = case2000()
+        elif self.network == 'Western10000':
+            self.ppc = case10000()
         else:
             raise NotImplementedError
 
     def readdata(self, scenario_idx):
-        self.ppc['bus'][self.load_bus, PD] = self.load_p_profiles[scenario_idx]
-        self.ppc['bus'][self.load_bus, QD] = self.load_q_profiles[scenario_idx]
+        # self.ppc['bus'][self.load_bus, PD] = self.load_p_profiles[scenario_idx]
+        try:
+            self.ppc['bus'][self.load_bus, PD] = self.ori_ppc['bus'][self.load_bus, PD] * self.load_profiles[scenario_idx, self.bus_areas[self.load_bus]] * self.last_load_noises
+        except:
+            import ipdb
+            ipdb.set_trace()
+        # self.ppc['bus'][self.load_bus, QD] = self.load_q_profiles[scenario_idx]
+        self.ppc['bus'][self.load_bus, QD] = self.ori_ppc['bus'][self.load_bus, QD] * self.load_profiles[scenario_idx, self.bus_areas[self.load_bus]] * self.last_load_noises
 
     def run_uopf(self):
         open_hot = np.zeros(self.ppc['num_gen'] + 1)
@@ -109,7 +134,7 @@ class Environment:
         onld = find((self.ppc["gen"][:, GEN_STATUS] > 0) & isload(self.ppc["gen"]))  ## disp loads in serv
         load_capacity = sum(self.ppc["bus"][:, PD]) - sum(self.ppc["gen"][onld, PMIN])  ## total load capacity
         Pmin = self.ppc["gen"][on, PMIN]
-        while sum(Pmin) > load_capacity:
+        while sum(Pmin) > load_capacity * 0.9:
             thermal_on = list(set(on) & set(self.ppc['thermal_ids']))
             if len(thermal_on) == 0:
                 break
@@ -128,7 +153,7 @@ class Environment:
             on = find((self.ppc["gen"][:, GEN_STATUS] > 0) & ~isload(self.ppc["gen"]))  ## gens in service
             Pmin = self.ppc["gen"][on, PMIN]
             close_hot[i] = 1
-            print('Shutting down generator %d.\n' % i)
+            # print('Shutting down generator %d.\n' % i)
 
         Pmax = self.ppc["gen"][on, PMAX]
         off = find((self.ppc["gen"][:, GEN_STATUS] == 0))
@@ -155,18 +180,27 @@ class Environment:
             off = find((self.ppc["gen"][:, GEN_STATUS] == 0))
             Pmax = self.ppc["gen"][on, PMAX]
             open_hot[i] = 1
-            print('restarting generator %d.\n' % i)
+            # print('restarting generator %d.\n' % i)
 
-        ppopt = ppoption(VERBOSE=0, OUT_ALL=1)
-        result = rundcopf(self.ppc, ppopt)
-        if result['success'] == False:
-            import ipdb
-            ipdb.set_trace()
+        ppopt = ppoption(VERBOSE=0, OUT_ALL=0, CONTINGENCY_AWARE=0)
+        # import ipdb
+        # ipdb.set_trace()
+        # x = time.time()
+        result = rundcopf(self.ppc, ppopt,
+                          # fname='opf.log'
+                          )
+        # print(f'contingency-aware dcopf cost {time.time()-x}s')
+        # import ipdb
+        # ipdb.set_trace()
+        # if result['success'] == False:
+        #     import ipdb
+        #     ipdb.set_trace()
             # result = rundcopf(self.ppc, ppopt)
             # if result['success'] == False:
             #     import ipdb
             #     ipdb.set_trace()
-        self.ppc = result
+        # print(f'on gens={self.ppc["gen"][:, GEN_STATUS].sum()}')
+        return result
 
 
     def rerun_opf(self, nextstep_renewable_gen_p_max):
@@ -175,7 +209,7 @@ class Environment:
         bal_gen_p_mid = (self.ppc['min_gen_p'][self.ppc['balanced_id']] + self.ppc['max_gen_p'][self.ppc['balanced_id']]) / 2
 
         self.ppc['gen'][:, PMAX] = np.array(self.ppc['max_gen_p'])
-        redundancy = (self.ppc['max_gen_p'][self.ppc['balanced_id']] - self.ppc['min_gen_p'][self.ppc['balanced_id']]) / 2 * 0.8
+        redundancy = (self.ppc['max_gen_p'][self.ppc['balanced_id']] - self.ppc['min_gen_p'][self.ppc['balanced_id']]) / 2 * 0.6
         self.ppc['gen'][self.ppc['balanced_id'], PMAX] = bal_gen_p_mid + redundancy
         self.ppc['gen'][self.ppc['renewable_ids'], PMAX] = np.array(nextstep_renewable_gen_p_max) * 0.2
         self.ppc['gen'][self.ppc['renewable_ids'], GEN_STATUS] = 1
@@ -196,30 +230,55 @@ class Environment:
             # else:
             #     self.ppc['gen'][i, [GEN_STATUS, PMIN, PMAX]] = 0.0
 
-        self.run_uopf()
+        self.ppc = self.run_uopf()
         # print(f'lower than min={np.where(self.ppc["gen"][:, PG]<self.ppc["gen"][:, PMIN])}')
         # print(f'larger than max={np.where(self.ppc["gen"][:, PG]>self.ppc["gen"][:, PMAX])}')
         self.ppc['gen'][:, PG] = self.ppc['gen'][:, PG].clip(self.ppc['gen'][:, PMIN], self.ppc['gen'][:, PMAX])
+        return self.ppc
 
     def power_flow(self):
         # print(f'sample_idx={self.sample_idx}, p_sum={sum(self.ppc["gen"][:, PG])}, d_sum={sum(self.ppc["bus"][self.load_bus, PD])}')
-        self.ppc['gen'][self.ppc['renewable_ids'], PMAX] = self.ppc['gen'][self.ppc['renewable_ids'], PG]
-        self.ppc['gen'][self.ppc['renewable_ids'], PMIN] = self.ppc['gen'][self.ppc['renewable_ids'], PG]
-        self.ppc['gen'][self.ppc['thermal_ids'], PMAX] = self.ppc['gen'][self.ppc['thermal_ids'], PG]
-        self.ppc['gen'][self.ppc['thermal_ids'], PMIN] = self.ppc['gen'][self.ppc['thermal_ids'], PG]
+        # self.ppc['gen'][self.ppc['renewable_ids'], PMAX] = self.ppc['gen'][self.ppc['renewable_ids'], PG]
+        # self.ppc['gen'][self.ppc['renewable_ids'], PMIN] = self.ppc['gen'][self.ppc['renewable_ids'], PG]
+        # self.ppc['gen'][self.ppc['thermal_ids'], PMAX] = self.ppc['gen'][self.ppc['thermal_ids'], PG]
+        # self.ppc['gen'][self.ppc['thermal_ids'], PMIN] = self.ppc['gen'][self.ppc['thermal_ids'], PG]
         # diff_p = sum(self.ppc['bus'][:, PD]) - sum(self.ppc['gen'][:, PG])
         # import ipdb
         # ipdb.set_trace()
         # if abs(diff_p) > 100:
         #     self.ppc['gen'][self.ppc['balanced_id'], PG] += diff_p
-        self.ppc['gen'][self.ppc["balanced_id"], PMAX] = self.ppc['gen'][self.ppc["balanced_id"], PG]
-        self.ppc['gen'][self.ppc["balanced_id"], PMIN] = self.ppc['gen'][self.ppc["balanced_id"], PG]
-        self.ppc, success = runpf(self.ppc, self.ppopt)
+        # self.ppc['gen'][self.ppc["balanced_id"], PMAX] = self.ppc['gen'][self.ppc["balanced_id"], PG]
+        # self.ppc['gen'][self.ppc["balanced_id"], PMIN] = self.ppc['gen'][self.ppc["balanced_id"], PG]
+
+        # import ipdb
+        # ipdb.set_trace()
+        # ppc = ext2int(self.ppc)
+        # Ybus, _, _ = makeYbus(ppc['baseMVA'], ppc['bus'], ppc['branch'])
+        # print(f'Ybus diag real min={np.diag(Ybus.toarray()).real.min()}, Ybus diag imag max={np.diag(Ybus.toarray()).imag.max()}')
+        ppopt = ppoption(PF_DC=False, VERBOSE=0, OUT_ALL=0,
+                         # PF_MAX_IT=50, PF_TOL=1e-6
+                         )
+        ppc = copy.deepcopy(self.ppc)
+        # ppc['bus'][:, VM] = 1.0
+        # ppc['bus'][:, VA] = 0.0
+        # ppc['gen'][:, VM] = 1.05
+        result, success = runpf(ppc, ppopt,
+                                # fname='pf.log'
+                                )
+        # if success:
+        self.ppc = result
+        # else:
+        #     import ipdb
+        #     ipdb.set_trace()
         if self.ppc['gen'][self.ppc["balanced_id"], PG] > self.ppc["max_gen_p"][self.ppc["balanced_id"]] or \
                 self.ppc['gen'][self.ppc['balanced_id'], PG] < self.ppc['min_gen_p'][self.ppc['balanced_id']]:
-            return False, f'balanced_gen_p out of limit {self.ppc["gen"][self.ppc["balanced_id"], PG]}'
-        self.ppc['gen'][:, PG] = self.ppc['gen'][:, PG].clip(self.ppc['gen'][:, PMIN], self.ppc['gen'][:, PMAX])
-        return self.ppc['success'], 'power flow not converged' if not success else ' '
+            # import ipdb
+            # ipdb.set_trace()
+            return False, f'balanced_gen_p out of limit {self.ppc["gen"][self.ppc["balanced_id"], PG]:.3f}, ' \
+                          f'max={self.ppc["max_gen_p"][self.ppc["balanced_id"]]:.3f},' \
+                          f'min={self.ppc["min_gen_p"][self.ppc["balanced_id"]]:.3f}'
+        # self.ppc['gen'][:, PG] = self.ppc['gen'][:, PG].clip(self.ppc['gen'][:, PMIN], self.ppc['gen'][:, PMAX])
+        return success, 'power flow not converged' if not success else ' '
 
     def update_ppc_from_obs(self, obs):
         self.ppc['gen'][:, PG] = obs.gen_p
@@ -257,14 +316,16 @@ class Environment:
 
         # Read self.sample_idx timestep data
         self.readdata(self.sample_idx)
-        print(f'gen_p_2={self.ppc["gen"][:, PG].sum()}, load_p_2={self.ppc["bus"][:, PD].sum()}, sample_idx={self.sample_idx}')
+        # print(f'gen_p_2={self.ppc["gen"][:, PG].sum()}, load_p_2={self.ppc["bus"][:, PD].sum()}, sample_idx={self.sample_idx}')
 
         # Update forecast value
-        curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max = \
-            self.forecast_reader.read_step_renewable_gen_p_max(self.sample_idx)
+        # print(f'reset, prev_renewable_noise_mean={self.last_renewable_noises.mean()}')
+        curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max, self.last_renewable_noises = \
+            self.forecast_reader.read_step_renewable_gen_p_max(self.sample_idx, self.last_renewable_noises)
+        # print(f'reset, after_renewable_noise_mean={self.last_renewable_noises.mean()}')
 
-        self.rerun_opf(nextstep_renewable_gen_p_max)
-        print(f'gen_p_2.5={self.ppc["gen"][:, PG].sum()}, load_p_2.5={self.ppc["bus"][:, PD].sum()}')
+        self.ppc = self.rerun_opf(nextstep_renewable_gen_p_max)
+        # print(f'gen_p_2.5={self.ppc["gen"][:, PG].sum()}, load_p_2.5={self.ppc["bus"][:, PD].sum()}')
         rounded_gen_p = self._round_p(self.ppc['gen'][:, PG])
         self._update_gen_status(self.ppc['gen'][:, PG], is_reset=True)
         self._check_gen_status(self.ppc['gen'][:, PG], rounded_gen_p)
@@ -273,9 +334,9 @@ class Environment:
         rho, v_or, v_ex, a_or, a_ex = self._calc_rho_v2()
 
         # Update forecast value
-        curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max = \
-            self.forecast_reader.read_step_renewable_gen_p_max(self.sample_idx)
-        nextstep_load_p = self.forecast_reader.read_step_load_p(self.sample_idx)
+        # curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max = \
+        #     self.forecast_reader.read_step_renewable_gen_p_max(self.sample_idx)
+        nextstep_load_p, self.last_load_noises = self.forecast_reader.read_step_load_p(self.sample_idx)
         action_space = self.action_space_cls.update(self.ppc, self.steps_to_recover_gen, self.steps_to_close_gen, self.steps_to_min_gen,
                                                      rounded_gen_p, nextstep_renewable_gen_p_max)
 
@@ -339,7 +400,7 @@ class Environment:
         timestep += 1
 
         # Examine if exceeding historical scenarios limit
-        if sample_idx >= self.load_p_profiles.shape[0]:
+        if sample_idx >= self.load_profiles.shape[0] - 288:
             self.done = True
             return self.return_res('Exceeding sample limit', self.done)
 
@@ -364,9 +425,9 @@ class Environment:
         self.last_injection_gen_p = copy.deepcopy(self.ppc['gen'][:, PG])
 
         # Update forecast value
-        curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max = \
-            self.forecast_reader.read_step_renewable_gen_p_max(sample_idx)
-        nextstep_load_p = self.forecast_reader.read_step_load_p(sample_idx)
+        curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max, self.last_renewable_noises = \
+            self.forecast_reader.read_step_renewable_gen_p_max(sample_idx, self.last_renewable_noises)
+        nextstep_load_p, self.last_load_noises = self.forecast_reader.read_step_load_p(sample_idx)
 
         future_renewable_gen_p_max = self.forecast_reader.read_Xstep_renewable_gen_p_max(self.sample_idx, self.ppc[
             'renewable_forecast_horizon'])
@@ -426,9 +487,9 @@ class Environment:
         self.last_injection_gen_p = copy.deepcopy(self.ppc['gen'][:, PG])
 
         # Update forecast value
-        curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max = \
-            self.forecast_reader.read_step_renewable_gen_p_max(self.sample_idx)
-        nextstep_load_p = self.forecast_reader.read_step_load_p(self.sample_idx)
+        curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max, self.last_renewable_noises = \
+            self.forecast_reader.read_step_renewable_gen_p_max(self.sample_idxs, self.last_renewable_noises)
+        nextstep_load_p, self.last_load_noises = self.forecast_reader.read_step_load_p(self.sample_idx)
 
         future_renewable_gen_p_max = self.forecast_reader.read_Xstep_renewable_gen_p_max(self.sample_idx, self.ppc[
             'renewable_forecast_horizon'])
@@ -473,7 +534,7 @@ class Environment:
         # Compute the injection action
         self.ppc['gen'][:, PG] += act['adjust_gen_p']   # actual power adjustion
         # self.ppc['gen'][:, VG] += act['adjust_gen_v']   # generator voltage adjust
-        print(f'gen_p_3={self.ppc["gen"][:, PG].sum()}, load_p_3={self.ppc["bus"][:, PD].sum()}')
+        # print(f'gen_p_3={self.ppc["gen"][:, PG].sum()}, load_p_3={self.ppc["bus"][:, PD].sum()}')
 
         # Check the legality of the action
         legal_flag, fail_info = is_legal(act, last_obs, self.ppc)
@@ -485,13 +546,13 @@ class Environment:
         self.ppc['branch'][:, BR_STATUS] = 1
         disc_ids = self.disconnect.get_disc_line(
             last_obs.rho, attack_all=self.attack_all, two_player=self.two_player, attack=None)
-        self.ppc['branch'][disc_ids, BR_STATUS] = 0
+        # self.ppc['branch'][disc_ids, BR_STATUS] = 0
 
         self.sample_idx += 1
         self.timestep += 1
 
         # Examine if exceeding historical scenarios limit
-        if self.sample_idx >= self.load_p_profiles.shape[0]:
+        if self.sample_idx >= self.load_profiles.shape[0] - 288:
             self.done = True
             return self.return_res('Exceeding sample limit', self.done)
 
@@ -510,14 +571,16 @@ class Environment:
             return self.return_res(info, self.done)
 
         rounded_gen_p = self._round_p(self.ppc['gen'][:, PG])
-        print(f'gen_p_4={self.ppc["gen"][:, PG].sum()}, load_p_4={self.ppc["bus"][:, PD].sum()}')
+        # print(f'gen_p_4={self.ppc["gen"][:, PG].sum()}, load_p_4={self.ppc["bus"][:, PD].sum()}')
         self._check_gen_status(self.ppc['gen'][:, PG], rounded_gen_p)
         self.last_injection_gen_p = copy.deepcopy(self.ppc['gen'][:, PG])
 
         # Update forecast value
-        curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max = \
-            self.forecast_reader.read_step_renewable_gen_p_max(self.sample_idx)
-        nextstep_load_p = self.forecast_reader.read_step_load_p(self.sample_idx)
+        # print(f'step, prev_renewable_noise_mean={self.last_renewable_noises.mean()}')
+        curstep_renewable_gen_p_max, nextstep_renewable_gen_p_max, self.last_renewable_noises = \
+            self.forecast_reader.read_step_renewable_gen_p_max(self.sample_idx, self.last_renewable_noises)
+        # print(f'step, after_renewable_noise_mean={self.last_renewable_noises.mean()}')
+        nextstep_load_p, self.last_load_noises = self.forecast_reader.read_step_load_p(self.sample_idx)
 
         future_renewable_gen_p_max = self.forecast_reader.read_Xstep_renewable_gen_p_max(self.sample_idx, self.ppc['renewable_forecast_horizon'])
         future_renewable_gen_p_max = np.array(future_renewable_gen_p_max).sum(-1).tolist()

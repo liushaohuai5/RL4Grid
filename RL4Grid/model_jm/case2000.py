@@ -40,6 +40,8 @@ def case2000():
     # 1 startup shutdown n x1 y1 ... xn yn
     # 2 startup shutdown n c(n-1) ... c0
     ppc["gencost"] = np.load(path+'TX2000_gencost.npy')
+    
+    ppc['coordinates'] = np.load(path+'TX2000_coordinates.npy')
 
     # ppc['bus'][:, BUS_AREA] = 1
     # ppc['branch'][:, [BR_R, BR_X, BR_B]] = np.abs(ppc['branch'][:, [BR_R, BR_X, BR_B]])
@@ -48,7 +50,14 @@ def case2000():
     # ppc['branch'][:, BR_B] /= 10
     # ppc['branch'][:, ANGMIN] = -360.0
     # ppc['branch'][:, ANGMAX] = 360.0
+
     ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(1e2, 1e8)
+    sensitive_line_idxs = [808, 1761, 611, 34, 463, 764, 539, 1589, 1552, 1591, 1590, 1588, 1412, 1413, 1360]
+    suggested_capacities = [500, 200, 400, 300, 200, 300, 200, 300, 200, 200, 200, 200, 350, 250, 350]
+    for i, idx in enumerate(sensitive_line_idxs):
+        ppc['branch'][idx, [RATE_A, RATE_B, RATE_C]] = suggested_capacities[i]
+
+    # ppc['gen'][:, [QMIN, QMAX]] *= 5
     # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = 10000.0
     # ppc['gencost'][:, 4] += 0.001
     # overload_lines = [438]
@@ -73,12 +82,16 @@ def case2000():
     # ppc['gencost'][ppc['renewable_ids'], -2] = 0
     # ppc['gencost'][ppc['renewable_ids'], -1] = 0
     ppc['sorted_controlable_ids'] = sorted(ppc['renewable_ids'] + ppc['thermal_ids'])
+
+    ppc['gen'][ppc['balanced_id'], PMAX] *= 3
+    ppc['gen'][ppc['balanced_id'], QMIN] = -ppc['gen'][ppc['balanced_id'], QMAX]
+
     ppc['min_gen_p'] = ppc['gen'][:, PMIN].tolist()
     # ppc['gen'][ppc['balanced_id'], PMAX] *= 5
     ppc['max_gen_p'] = ppc['gen'][:, PMAX].tolist()
     for i in range(ppc['num_gen']):
         if i in ppc['thermal_ids']:
-            ppc['min_gen_p'][i] = np.around(0.4 * ppc['gen'][i, PMAX], decimals=2).tolist()
+            ppc['min_gen_p'][i] = np.around(0.2 * ppc['gen'][i, PMAX], decimals=2).tolist()
             ppc['gen'][i, PMIN] = ppc['min_gen_p'][i]
     for i, bus in enumerate(ppc['gen'][:, GEN_BUS].tolist()):
         bus_idx = ppc['bus'][:, BUS_I].tolist().index(bus)
@@ -110,7 +123,7 @@ def case2000():
     ppc['min_balanced_gen_bound'] = 0.9
     ppc['max_balanced_gen_bound'] = 1.1
 
-    ppc['ramp_rate'] = 0.05
+    ppc['ramp_rate'] = 0.06
     ppc['max_steps_to_recover_gen'] = []
     ppc['max_steps_to_close_gen'] = []
     ppc['fast_thermal_gen'] = []

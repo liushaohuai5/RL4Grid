@@ -58,16 +58,19 @@ class ActionSpace(object):
                     low[idx] = 0.0
 
             elif gen_p[idx] > self.min_gen_p[idx]:
+                # if idx == 12:
+                #     import ipdb
+                #     ipdb.set_trace()
                 low[idx] = max(min_capa_adjust[idx], -max_ramp_adjust[idx])
                 high[idx] = min(max_capa_adjust[idx], max_ramp_adjust[idx])
-                if steps_to_close_gen[idx] == 0:  # can turn off
-                    low[idx] = max(-gen_p[idx], -max_ramp_adjust[idx])
-            else:
-                gen_p[idx] = 0.0
-                low[idx] = 0.0
-                high[idx] = self.min_gen_p[idx]
-                if steps_to_recover_gen[idx] != 0 or steps_to_min_gen[idx] > 0:  # cannot turn on
-                    high[idx] = 0.0
+                # if steps_to_close_gen[idx] == 0:  # can turn off
+                #     low[idx] = max(-gen_p[idx], -max_ramp_adjust[idx])
+            # else:
+            #     gen_p[idx] = 0.0
+            #     low[idx] = 0.0
+            #     high[idx] = self.min_gen_p[idx]
+            #     if steps_to_recover_gen[idx] != 0 or steps_to_min_gen[idx] > 0:  # cannot turn on
+            #         high[idx] = 0.0
             #     import ipdb
             #     ipdb.set_trace()
             #     assert False
@@ -111,6 +114,9 @@ class ActionSpace(object):
         low_adjust_p, high_adjust_p = self.get_p_range(
             gen_p, steps_to_recover_gen, steps_to_close_gen, steps_to_min_gen, nextstep_renewable_gen_p_max
         )
+        if not (low_adjust_p <= high_adjust_p).all():
+            import ipdb
+            ipdb.set_trace()
         action_space_p = spaces.Box(low=low_adjust_p, high=high_adjust_p)
 
         low_adjust_v, high_adjust_v = self.get_v_range(gen_v)

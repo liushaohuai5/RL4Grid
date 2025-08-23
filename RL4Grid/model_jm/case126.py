@@ -61,7 +61,8 @@ def case126():
     ppc['max_gen_p'] = ppc['gen'][:, PMAX].tolist()
     for i in range(ppc['num_gen']):
         if i in ppc['thermal_ids']:
-            ppc['min_gen_p'][i] = np.around(0.5 * ppc['gen'][i, PMAX], decimals=2).tolist()
+            ppc['min_gen_p'][i] = np.around(0.2 * ppc['gen'][i, PMAX], decimals=2).tolist()
+            ppc['gen'][i, PMIN] = ppc['min_gen_p'][i]
     ppc['min_gen_q'] = [-180.0 for _ in range(ppc['num_gen'])]
     ppc['max_gen_q'] = [100.0 for _ in range(ppc['num_gen'])]
     ppc['min_gen_v'] = [0.9 for _ in range(ppc['num_gen'])]

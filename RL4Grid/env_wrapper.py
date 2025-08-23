@@ -10,6 +10,7 @@ class GridSimWrapper:
         self.step_cnt = 0
 
     def step(self, action):
+        action = {'adjust_gen_p': action, 'adjust_gen_v': np.zeros_like(action)}
         observation, reward, done, info = self.env.step(action)
         self.step_cnt += 1
         self.last_obs = copy.deepcopy(observation)

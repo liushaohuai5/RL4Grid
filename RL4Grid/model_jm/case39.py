@@ -253,7 +253,8 @@ def case39():
     ppc['max_gen_p'] = ppc['gen'][:, PMAX].tolist()
     for i in range(ppc['num_gen']):
         if i in ppc['thermal_ids']:
-            ppc['min_gen_p'][i] = np.around(0.4 * ppc['gen'][i, PMAX], decimals=2).tolist()
+            ppc['min_gen_p'][i] = np.around(0.2 * ppc['gen'][i, PMAX], decimals=2).tolist()
+            ppc['gen'][i, PMIN] = ppc['min_gen_p'][i]
     for i, bus in enumerate(ppc['gen'][:, GEN_BUS].tolist()):
         bus_idx = ppc['bus'][:, BUS_I].tolist().index(bus)
         if ppc['bus'][bus_idx, BUS_TYPE] not in [2, 3]:
