@@ -905,10 +905,10 @@ def case300():
         [2, 0, 0, 3, 1.25, 20, 0]
     ])
 
-    ppc['branch'][:, [BR_R, BR_X, BR_B]] = np.abs(ppc['branch'][:, [BR_R, BR_X, BR_B]])
-    ppc['branch'][:, BR_X] /= 10
+    # ppc['branch'][:, [BR_R, BR_X, BR_B]] = np.abs(ppc['branch'][:, [BR_R, BR_X, BR_B]])
+    # ppc['branch'][:, BR_X] /= 10
     # ppc['branch'][:, BR_X] = ppc['branch'][:, BR_X].clip(0.001, 10000)
-    ppc['branch'][:, BR_B] /= 10
+    # ppc['branch'][:, BR_B] /= 10
     # ppc['branch'][:, RATE_A] = ppc['branch'][:, RATE_A].clip(100.0, 10000)
 
     ppc['network'] = 'IEEE300'
@@ -939,7 +939,7 @@ def case300():
         else:
             ppc['gen_type'][i] = 2
     ppc['sorted_controlable_ids'] = sorted(ppc['renewable_ids'] + ppc['thermal_ids'])
-    # ppc['gen'][ppc['renewable_ids'], PMIN] = 0.0
+    ppc['gen'][ppc['renewable_ids'], PMIN] = 0.0
     ppc['min_gen_p'] = ppc['gen'][:, PMIN].tolist()
     ppc['max_gen_p'] = ppc['gen'][:, PMAX].tolist()
     for i in range(ppc['num_gen']):
@@ -951,6 +951,7 @@ def case300():
         if ppc['bus'][bus_idx, BUS_TYPE] not in [2, 3]:
             print('there is a PQ gen')
         ppc['bus'][bus_idx, BUS_TYPE] = 3 if i == ppc['balanced_id'] else 2
+
     ppc['min_gen_q'] = ppc['gen'][:, QMIN]
     ppc['max_gen_q'] = ppc['gen'][:, QMAX]
     ppc['min_gen_v'] = [0.9 for _ in range(ppc['num_gen'])]

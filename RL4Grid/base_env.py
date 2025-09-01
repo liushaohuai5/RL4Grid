@@ -31,24 +31,13 @@ class Environment:
     '''
     Environment Initialization
     '''
-    def __init__(self, network, reward_type="EPRIReward", is_test=False, two_player=False, attack_all=False):
-        self.network = network
-        if self.network == 'IEEE14':
-            self.ppc = case14()
-        elif self.network == 'IEEE39':
-            self.ppc = case39()
-        elif self.network == 'IEEE57':
-            self.ppc = case57()
-        elif self.network == 'SG126':
-            self.ppc = case126()
-        elif self.network == 'IEEE300':
-            self.ppc = case300()
-        elif self.network == 'Texas2000':
-            self.ppc = case2000()
-        elif self.network == 'Western10000':
-            self.ppc = case10000()
-        else:
-            raise NotImplementedError('Available grids are IEEE14, 39, 57, 300; Synthetic grids are SG126, Texas2000, Western10000')
+    def __init__(self, network_ppc, reward_type="EPRIReward", is_test=False, two_player=False, attack_all=False):
+        self.network_ppc = network_ppc
+        for k, v in network_ppc.items():
+            self.network = k
+            self.ppc = copy.deepcopy(v)
+        # import ipdb
+        # ipdb.set_trace()
 
         if self.network in ['Texas2000', 'Western10000']:
             self.visualizer = Visualizer(self.ppc)
@@ -77,8 +66,10 @@ class Environment:
         self.solar_profiles = np.load(self.solar_path)
         self.wind_path = root_path + f'/data/{"test" if is_test else "train"}/wind.npy'
         self.wind_profiles = np.load(self.wind_path)
-        self.bus_areas = random.sample(list(range(self.load_profiles.shape[1])), int(self.ppc['bus'][:, BUS_AREA].max()))
-        self.bus_areas = np.asarray([self.bus_areas[int(i)-1] for i in self.ppc['bus'][:, BUS_AREA].tolist()])
+        self.num_sample = self.load_profiles.shape[0]
+        area_codes, areas = pd.factorize(self.ppc['bus'][:, BUS_AREA].tolist())
+        self.bus_areas = random.sample(list([i for i in range(self.load_profiles.shape[1])]), len(areas))
+        self.bus_areas = np.asarray([self.bus_areas[i] for i in area_codes.tolist()])
         self.ori_ppc = copy.deepcopy(self.ppc)
         self.renewable_masks = np.asarray([int(random.random() > 0.5) for _ in range(len(self.ppc['renewable_ids']))])     # 0-solar, 1-wind
         self.last_load_noises = np.ones(self.ppc['num_bus'])[self.load_bus]
@@ -96,22 +87,10 @@ class Environment:
         self.steps_to_close_gen = np.zeros(self.num_gen, dtype=int)
         self.steps_to_min_gen = -np.ones(self.num_gen, dtype=int)
 
-        if self.network == 'IEEE14':
-            self.ppc = case14()
-        elif self.network == 'IEEE39':
-            self.ppc = case39()
-        elif self.network == 'IEEE57':
-            self.ppc = case57()
-        elif self.network == 'SG126':
-            self.ppc = case126()
-        elif self.network == 'IEEE300':
-            self.ppc = case300()
-        elif self.network == 'Texas2000':
-            self.ppc = case2000()
-        elif self.network == 'Western10000':
-            self.ppc = case10000()
-        else:
-            raise NotImplementedError
+        for k, v in self.network_ppc.items():
+            self.network = k
+            self.ppc = copy.deepcopy(v)
+
 
     def readdata(self, scenario_idx):
         # self.ppc['bus'][self.load_bus, PD] = self.load_p_profiles[scenario_idx]
@@ -189,6 +168,14 @@ class Environment:
         result = rundcopf(self.ppc, ppopt,
                           # fname='opf.log'
                           )
+        if not result['success']:
+            ppopt = ppoption(VERBOSE=1, OUT_ALL=1, CONTINGENCY_AWARE=0)
+            result = rundcopf(self.ppc, ppopt,
+                              fname=f'dcopf_{self.network}.log'
+                              )
+            print(f'----------------------DCOPF failed in {self.network}--------------------')
+            import ipdb
+            ipdb.set_trace()
         # print(f'contingency-aware dcopf cost {time.time()-x}s')
         # import ipdb
         # ipdb.set_trace()
@@ -216,7 +203,6 @@ class Environment:
         self.ppc['gen'][:, PMIN] = np.array(self.ppc['min_gen_p'])
         self.ppc['gen'][self.ppc['renewable_ids'], PMIN] = 0.0
         self.ppc['gen'][self.ppc['balanced_id'], PMIN] = bal_gen_p_mid - redundancy
-
         # self.ppc['bus'][:, VM] = 1.0
         # self.ppc['bus'][:, VA] = 0.0
         # self.ppc['gen'][:, VG] = 1.05
@@ -230,7 +216,11 @@ class Environment:
             # else:
             #     self.ppc['gen'][i, [GEN_STATUS, PMIN, PMAX]] = 0.0
 
+        # try:
         self.ppc = self.run_uopf()
+        # except:
+        #     import ipdb
+        #     ipdb.set_trace()
         # print(f'lower than min={np.where(self.ppc["gen"][:, PG]<self.ppc["gen"][:, PMIN])}')
         # print(f'larger than max={np.where(self.ppc["gen"][:, PG]>self.ppc["gen"][:, PMAX])}')
         self.ppc['gen'][:, PG] = self.ppc['gen'][:, PG].clip(self.ppc['gen'][:, PMIN], self.ppc['gen'][:, PMAX])
@@ -262,14 +252,18 @@ class Environment:
         # ppc['bus'][:, VM] = 1.0
         # ppc['bus'][:, VA] = 0.0
         # ppc['gen'][:, VM] = 1.05
-        result, success = runpf(ppc, ppopt,
-                                # fname='pf.log'
-                                )
-        # if success:
-        self.ppc = result
-        # else:
-        #     import ipdb
-        #     ipdb.set_trace()
+        result, success = runpf(ppc, ppopt)
+        if success:
+            self.ppc = result
+        else:
+            ppopt = ppoption(PF_DC=False, VERBOSE=1, OUT_ALL=1)
+            ppc = copy.deepcopy(self.ppc)
+            # ppc['bus'][:, VM] = 1.0
+            # ppc['bus'][:, VA] = 0.0
+            result, success = runpf(ppc, ppopt, fname=f'pf_{self.network}.log')
+            print(f'----------------------ACPF failed in {self.network}--------------------')
+            import ipdb
+            ipdb.set_trace()
         if self.ppc['gen'][self.ppc["balanced_id"], PG] > self.ppc["max_gen_p"][self.ppc["balanced_id"]] or \
                 self.ppc['gen'][self.ppc['balanced_id'], PG] < self.ppc['min_gen_p'][self.ppc['balanced_id']]:
             # import ipdb
@@ -311,8 +305,8 @@ class Environment:
         if start_sample_idx is not None:
             self.sample_idx = start_sample_idx
         else:
-            self.sample_idx = self.np_random.randint(0, self.ppc['num_sample'])
-        assert self.ppc['num_sample'] > self.sample_idx >= 0
+            self.sample_idx = self.np_random.randint(0, self.num_sample - 300)
+        assert self.num_sample > self.sample_idx >= 0
 
         # Read self.sample_idx timestep data
         self.readdata(self.sample_idx)
@@ -344,7 +338,6 @@ class Environment:
         future_renewable_gen_p_max = np.array(future_renewable_gen_p_max).sum(-1).tolist()
         future_load_p = self.forecast_reader.read_Xstep_load_p(self.sample_idx, self.ppc['load_forecast_horizon'])
         future_load_p = np.array(future_load_p).sum(-1).tolist()
-
         self.obs = Observation(
             ppc=self.ppc, load_bus=self.load_bus, timestep=self.timestep, action_space=action_space,
             steps_to_reconnect_line=self.disconnect.steps_to_reconnect_line,
@@ -611,8 +604,8 @@ class Environment:
             future_renewable_gen_p_max=future_renewable_gen_p_max,
             future_load_p=future_load_p
         )
-        if sum(self.obs.gen_p[self.ppc['renewable_ids']]) - sum(self.obs.curstep_renewable_gen_p_max) > 1.0:
-            print('renewable exceeds')
+        # if sum(self.obs.gen_p[self.ppc['renewable_ids']]) - sum(self.obs.curstep_renewable_gen_p_max) > 1.0:
+        #     print('renewable exceeds')
         self.reward = self.get_reward(self.obs, last_obs)
         return self.return_res()
 
@@ -620,8 +613,8 @@ class Environment:
         return (self.obs, self.sample_idx)
 
     def _calc_rho_v2(self):
-        limit = self.ppc['line_thermal_limit']
-        num_line = min(self.ppc['num_line'], len(self.ppc['line_thermal_limit']))
+        limit = self.ppc['branch'][:, RATE_A]
+        num_line = min(self.ppc['num_line'], len(limit))
         p_or = self.ppc['branch'][:, PF]
         p_ex = self.ppc['branch'][:, PT]
         q_or = self.ppc['branch'][:, QF]
@@ -654,10 +647,10 @@ class Environment:
         from (0, min_gen_p) to 0/min_gen_p
         """
         for i in self.ppc['thermal_ids']:
-            if self.ppc['gen'][i, PG] > 0 and self.ppc['gen'][i, PG] < self.ppc['min_gen_p'][i]:
+            if self.ppc['gen'][i, PG] >= 0 and self.ppc['gen'][i, PG] < self.ppc['min_gen_p'][i]:
                 if (self.last_injection_gen_p[i] - self.ppc['min_gen_p'][i]) < 1e-3:
                     self.ppc['gen'][i, PG] = 0.0  # close the generator
-                elif self.last_injection_gen_p[i] > self.ppc['min_gen_p'][i]:
+                elif self.last_injection_gen_p[i] - self.ppc['min_gen_p'][i] >= 1e-3:
                     self.ppc['gen'][i, PG] = self.ppc['min_gen_p'][i]  # mapped to the min_gen_p
                 elif abs(self.last_injection_gen_p[i]) < 1e-3:
                     if i in self.ppc['fast_thermal_gen']:
@@ -817,9 +810,9 @@ class Environment:
         ret_obs = copy.deepcopy(self.obs)
         if done:
             if not info:
-                return ret_obs, 0, True, {}
+                return ret_obs, -10, True, {}
             else:
-                return ret_obs, 0, True, {'fail_info': info}
+                return ret_obs, -10, True, {'fail_info': info}
         else:
             assert self.reward, "the reward are not calculated yet"
             return ret_obs, self.reward, False, {}

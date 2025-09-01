@@ -167,8 +167,8 @@ def rerun_opf(observation, ppc):
 
 
 
-network = 'IEEE39'
-env = RL4Grid.make_gridsim(network=network)
+network_ppc = {'IEEE39': case39()}
+env = RL4Grid.make_gridsim(network_ppc=network_ppc)
 
 # cases = [
 #     # bus_num, injected_load

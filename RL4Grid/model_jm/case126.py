@@ -31,6 +31,7 @@ def case126():
     ## branch data
     # fbus, tbus, r, x, b, rateA, rateB, rateC, ratio, angle, status, angmin, angmax
     ppc["branch"] = np.load(path+'SG126_branch.npy')
+    # ppc["branch"] = ppc["branch"][:185, :]
 
     ##-----  OPF Data  -----##
     ## generator cost data
@@ -53,6 +54,7 @@ def case126():
     1, 1, 1, 5])
     ppc['thermal_ids'] = np.where(ppc['gen_type'] == 1)[0].tolist()
     ppc['renewable_ids'] = np.where(ppc['gen_type'] == 5)[0].tolist()
+    ppc['gen'][ppc['renewable_ids'], PMIN] = 0.0
     balanced_bus = ppc['bus'][np.where(ppc['bus'][:, BUS_TYPE] == 3)[0][0], BUS_I]
     ppc['balanced_id'] = np.where(ppc['gen'][:, GEN_BUS]+1==balanced_bus)[0][0]
     # ppc['balanced_id'] = np.where(ppc['gen_type'] == 2)[0].tolist()[0]

@@ -241,6 +241,7 @@ def case39():
     ppc['gen_type'][ppc['balanced_id']] = 2
     ppc['renewable_ids'] = [4, 6, 7]
     ppc['thermal_ids'] = [0, 2, 3, 5, 8, 9]
+    ppc['gen'][ppc['renewable_ids'], PMIN] = 0.0
     for i in range(ppc['num_gen']):
         if i in ppc['thermal_ids']:
             ppc['gen_type'][i] = 1
@@ -283,26 +284,26 @@ def case39():
     ppc['max_balanced_gen_bound'] = 1.1
 
     ppc['ramp_rate'] = 0.05
-    ppc['max_steps_to_recover_gen'] = []
-    ppc['max_steps_to_close_gen'] = []
-    ppc['fast_thermal_gen'] = []
-    thresholds = [100, 140]  # TODO: need adjust
-    for i in range(ppc['num_gen']):
-        if i in ppc['thermal_ids']:
-            if ppc['max_gen_p'][i] <= thresholds[0]:
-                ppc['max_steps_to_recover_gen'].append(10)
-                ppc['max_steps_to_close_gen'].append(10)
-                ppc['fast_thermal_gen'].append(i)
-            elif ppc['max_gen_p'][i] <= thresholds[1]:
-                ppc['max_steps_to_recover_gen'].append(20)
-                ppc['max_steps_to_close_gen'].append(20)
-                ppc['fast_thermal_gen'].append(i)
-            else:
-                ppc['max_steps_to_recover_gen'].append(40)
-                ppc['max_steps_to_close_gen'].append(40)
-        else:
-            ppc['max_steps_to_recover_gen'].append(40)
-            ppc['max_steps_to_close_gen'].append(40)
+    ppc['max_steps_to_recover_gen'] = [10 for _ in range(ppc['num_gen'])]
+    ppc['max_steps_to_close_gen'] = [10 for _ in range(ppc['num_gen'])]
+    ppc['fast_thermal_gen'] = ppc['thermal_ids'] #[]
+    # thresholds = [100, 140]  # TODO: need adjust
+    # for i in range(ppc['num_gen']):
+    #     if i in ppc['thermal_ids']:
+    #         if ppc['max_gen_p'][i] <= thresholds[0]:
+    #             ppc['max_steps_to_recover_gen'].append(10)
+    #             ppc['max_steps_to_close_gen'].append(10)
+    #             ppc['fast_thermal_gen'].append(i)
+    #         elif ppc['max_gen_p'][i] <= thresholds[1]:
+    #             ppc['max_steps_to_recover_gen'].append(20)
+    #             ppc['max_steps_to_close_gen'].append(20)
+    #             ppc['fast_thermal_gen'].append(i)
+    #         else:
+    #             ppc['max_steps_to_recover_gen'].append(40)
+    #             ppc['max_steps_to_close_gen'].append(40)
+    #     else:
+    #         ppc['max_steps_to_recover_gen'].append(40)
+    #         ppc['max_steps_to_close_gen'].append(40)
     ppc['thermal_start_response_steps'] = 5
 
     # renewable generators

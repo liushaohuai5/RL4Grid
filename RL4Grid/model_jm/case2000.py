@@ -64,16 +64,35 @@ def case2000():
     # ppc['branch'][overload_lines, [RATE_A]] *= 5
 
     ppc['network'] = 'Texas2000'
-    ppc['num_gen'] = ppc['gen'].shape[0]
     ppc['num_bus'] = ppc['bus'].shape[0]
-    ppc['num_line'] = ppc['branch'].shape[0]  # 185 ori
+    bus_gen = [[] for _ in range(ppc['num_bus'])]
+    for i, bus in enumerate(ppc['gen'][:, GEN_BUS].tolist()):
+        idx = ppc['bus'][:, BUS_I].tolist().index(bus)
+        bus_gen[idx].append(i)
+    del_rows = []
+    for bg in bus_gen:
+        if len(bg) > 1:
+            g1 = bg[0]
+            for g2 in bg:
+                if g2 != g1:
+                    ppc['gen'][g1, [PG, QG, QMAX, QMIN, PMAX, PMIN, PC1, PC2, QC1MIN, QC1MAX, QC2MIN, QC2MAX, RAMP_AGC, RAMP_10,
+                                    RAMP_30, RAMP_Q]] \
+                        += ppc['gen'][
+                        g2, [PG, QG, QMAX, QMIN, PMAX, PMIN, PC1, PC2, QC1MIN, QC1MAX, QC2MIN, QC2MAX, RAMP_AGC, RAMP_10,
+                             RAMP_30, RAMP_Q]]
+                    del_rows.append(g2)
+    ppc['gen'] = np.delete(ppc['gen'], del_rows, axis=0)
+    ppc['gencost'] = np.delete(ppc['gencost'], del_rows, axis=0)
+    ppc['num_gen'] = ppc['gen'].shape[0]
+    ppc['num_line'] = ppc['branch'].shape[0]
     ppc['gen_bus'] = []
-    for bus in ppc['gen'][:, GEN_BUS].tolist():
+    for i, bus in enumerate(ppc['gen'][:, GEN_BUS].tolist()):
         idx = ppc['bus'][:, BUS_I].tolist().index(bus)
         ppc['gen_bus'].append(idx)
     ppc['load_bus'] = np.nonzero(ppc['bus'][:, PD])[0].tolist()
     ppc['num_load'] = len(ppc['load_bus'])
-    ppc['gen_type'] = np.load(path+'TX2000_gen_type.npy')[:ppc['num_gen']]
+    ppc['gen_type'] = np.load(path+'TX2000_gen_type.npy')
+    ppc['gen_type'] = np.delete(ppc['gen_type'], del_rows)[:ppc['num_gen']]
     balanced_bus = ppc['bus'][np.where(ppc['bus'][:, BUS_TYPE] == 3)[0][0], BUS_I]
     ppc['balanced_id'] = np.where(ppc['gen'][:, GEN_BUS] == balanced_bus)[0][0]
     ppc['gen_type'][ppc['balanced_id']] = 2
@@ -81,9 +100,10 @@ def case2000():
     ppc['renewable_ids'] = np.where(ppc['gen_type'] == 5)[0].tolist()
     # ppc['gencost'][ppc['renewable_ids'], -2] = 0
     # ppc['gencost'][ppc['renewable_ids'], -1] = 0
+    ppc['gen'][ppc['renewable_ids'], PMIN] = 0.0
     ppc['sorted_controlable_ids'] = sorted(ppc['renewable_ids'] + ppc['thermal_ids'])
 
-    ppc['gen'][ppc['balanced_id'], PMAX] *= 3
+    ppc['gen'][ppc['balanced_id'], PMAX] *= 5
     ppc['gen'][ppc['balanced_id'], QMIN] = -ppc['gen'][ppc['balanced_id'], QMAX]
 
     ppc['min_gen_p'] = ppc['gen'][:, PMIN].tolist()
@@ -123,7 +143,7 @@ def case2000():
     ppc['min_balanced_gen_bound'] = 0.9
     ppc['max_balanced_gen_bound'] = 1.1
 
-    ppc['ramp_rate'] = 0.06
+    ppc['ramp_rate'] = 0.1
     ppc['max_steps_to_recover_gen'] = []
     ppc['max_steps_to_close_gen'] = []
     ppc['fast_thermal_gen'] = []

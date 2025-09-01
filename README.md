@@ -28,7 +28,7 @@ import gym
 import RL4Grid  # Import your environment
 
 # Create the environment
-env = RL4Grid.make_gridsim('IEEE14')
+env = RL4Grid.make_gridsim({'IEEE14': case14()})
 
 # Reset the environment
 env.reset()
