@@ -33,9 +33,6 @@ def is_legal(act, last_obs, ppc):
     adjust_gen_v = act['adjust_gen_v']
 
     gen_p_illegal_ids = check_gen_p(adjust_gen_p, action_space_gen_p, gen_ids, ppc['action_allow_precision'])
-    if len(gen_p_illegal_ids) > 0:
-        import ipdb
-        ipdb.set_trace()
     gen_v_illegal_ids = check_gen_v(adjust_gen_v, action_space_gen_v, gen_ids, ppc['action_allow_precision'])
 
     if gen_p_illegal_ids:

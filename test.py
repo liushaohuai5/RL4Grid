@@ -163,13 +163,7 @@ def rerun_opf(observation, ppc):
     return new_gen_p, recover_ids, close_ids, result
 
 
-
-
-
-
-network_ppc = {'IEEE39': case39()}
-env = RL4Grid.make_gridsim(network_ppc=network_ppc)
-
+# datacenter's influence on LMP, Tariff project
 # cases = [
 #     # bus_num, injected_load
 #     [1636, 1000],   # case 1, houston connected 1GW
@@ -189,53 +183,57 @@ env = RL4Grid.make_gridsim(network_ppc=network_ppc)
 # import ipdb
 # ipdb.set_trace()
 
-ppc_lst = []
-target_dones = 0
-for i in range(0, 35132):
-    # i = 35132//2
-    # i = 6660
-    # i = 28193
-    obs = env.reset(start_sample_idx=i)
-    action_high = obs.action_space['adjust_gen_p'].high
-    action_low = obs.action_space['adjust_gen_p'].low
-    ppc = copy.deepcopy(env.env.ppc)
-    new_gen_p, _, _, result = rerun_opf(obs, ppc)
-    if not result['success']:
-        continue
-    best_a = new_gen_p - np.asarray(obs.gen_p)
-    best_a = best_a.clip(action_low, action_high)
-    # import ipdb
-    # ipdb.set_trace()
-    # prev_p = copy.deepcopy(obs.gen_p)
-    # adjust_gen_v = np.zeros(ppc['num_gen'])
-    # adjust_gen_v = adjust_gen_v.clip(obs.action_spastepce['adjust_gen_v'].low, obs.action_space['adjust_gen_v'].high)
-    # _, best_reward, target_done, info = env.step({'adjust_gen_p': best_a, 'adjust_gen_v': adjust_gen_v})
-    _, best_reward, target_done, info = env.step(best_a)
-    # env.env.visualizer.plot(env.env.ppc, save_path=f'./figs/{env.env.ppc["network"]}', step=i)
-    if target_done:
-        mismatch_ids = np.where(np.abs(new_gen_p - env.env.ppc['gen'][:, PG])>1)[0].tolist()
-        for idx in mismatch_ids:
-            print(f'scenario={i}, gen_idx={idx}, gen_bus={env.env.ppc["gen"][idx, GEN_BUS]}, is_renewable={idx in env.env.ppc["renewable_ids"]}, is_thermal={idx in env.env.ppc["thermal_ids"]}, '
-                  f'is_balanced={idx == env.env.ppc["balanced_id"]}, prev_p={new_gen_p[idx]}, now_gen_p={env.env.ppc["gen"][idx, PG]}')
-        print(f'target done, {info}')
-        target_dones += 1
-    else:
-        ppc_dict = {}
-        ppc_dict['bus'] = env.env.ppc['bus']
-        ppc_dict['branch'] = env.env.ppc['branch']
-        ppc_dict['gen'] = env.env.ppc['gen']
-        ppc_dict['target_gen_p'] = new_gen_p
-        ppc_dict['index'] = i
-        ppc_lst.append(ppc_dict)
-        if i % 100 == 0:
-            print("********************************************")
-            print(f'{i}, network={network}, target_dones={target_dones}')
-            print("--------------------------------------------")
 
-import pickle
-filehandler = open(f"ppc_lst_{network}.pkl", "wb")
-pickle.dump(ppc_lst, filehandler)
-filehandler = open(f'ppc_lst_{network}.pkl', "rb")
-data = pickle.load(filehandler)
+
+ppc_dict = {
+    # 'IEEE14': case14(),
+    # 'IEEE39': case39(),
+    # 'IEEE57': case57(),
+    # 'SG126': case126(),
+    # 'IEEE300': case300(),
+    'Texas2000': case2000(),
+}
+for network, ppc in ppc_dict.items():
+    env = RL4Grid.make_gridsim(network_ppc={network: ppc}, deterministic=True)
+    ppc_lst = []
+    target_dones = 0
+    for i in range(0, 35132):
+        obs = env.reset(start_sample_idx=i)
+        action_high = obs.action_space['adjust_gen_p'].high
+        action_low = obs.action_space['adjust_gen_p'].low
+        ppc = copy.deepcopy(env.env.ppc)
+        new_gen_p, _, _, result = rerun_opf(obs, ppc)
+        if not result['success']:
+            continue
+        best_a = new_gen_p - np.asarray(obs.gen_p)
+        best_a = best_a.clip(action_low, action_high)
+        _, best_reward, target_done, info = env.step(best_a)
+        # env.env.visualizer.plot(env.env.ppc, save_path=f'./figs/{env.env.ppc["network"]}', step=i)
+        if target_done:
+            mismatch_ids = np.where(np.abs(new_gen_p - env.env.ppc['gen'][:, PG])>1)[0].tolist()
+            for idx in mismatch_ids:
+                print(f'scenario={i}, gen_idx={idx}, gen_bus={env.env.ppc["gen"][idx, GEN_BUS]}, is_renewable={idx in env.env.ppc["renewable_ids"]}, is_thermal={idx in env.env.ppc["thermal_ids"]}, '
+                      f'is_balanced={idx == env.env.ppc["balanced_id"]}, prev_p={new_gen_p[idx]}, now_gen_p={env.env.ppc["gen"][idx, PG]}')
+            print(f'target done, {info}')
+            target_dones += 1
+        else:
+            ppc_dict = {}
+            ppc_dict['bus'] = env.env.ppc['bus']
+            ppc_dict['branch'] = env.env.ppc['branch']
+            ppc_dict['gen'] = env.env.ppc['gen']
+            ppc_dict['target_gen_p'] = new_gen_p
+            ppc_dict['index'] = i
+            ppc_lst.append(ppc_dict)
+            if i % 100 == 0:
+                print("********************************************")
+                print(f'{i}, network={network}, target_dones={target_dones}')
+                print("--------------------------------------------")
+
+    import pickle
+    filehandler = open(f"ppc_lst_{network}.pkl", "wb")
+    pickle.dump(ppc_lst, filehandler)
+    # filehandler = open(f'ppc_lst_{network}.pkl', "rb")
+    # data = pickle.load(filehandler)
+
 import ipdb
 ipdb.set_trace()
