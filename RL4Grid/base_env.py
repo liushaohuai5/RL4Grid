@@ -31,13 +31,11 @@ class Environment:
     '''
     Environment Initialization
     '''
-    def __init__(self, network_ppc, reward_type="EPRIReward", is_test=False, two_player=False, attack_all=False):
+    def __init__(self, network_ppc, reward_type="EPRIReward", is_test=False, two_player=False, attack_all=False, deterministic=False):
         self.network_ppc = network_ppc
         for k, v in network_ppc.items():
             self.network = k
             self.ppc = copy.deepcopy(v)
-        # import ipdb
-        # ipdb.set_trace()
 
         if self.network in ['Texas2000', 'Western10000']:
             self.visualizer = Visualizer(self.ppc)
@@ -47,35 +45,43 @@ class Environment:
         self.num_line = self.ppc['branch'].shape[0]
         self.ppopt = ppoption(PF_DC=False, VERBOSE=0, OUT_ALL=0)
 
+
         self.reward_type = reward_type
         self.done = True
         self.action_space_cls = ActionSpace(self.ppc)
         self.is_test = is_test
         self.two_player = two_player
         self.attack_all = attack_all
-        root_path = os.path.dirname(os.path.abspath(__file__))
-        # self.load_p_filepath = root_path + f'/data/{"test" if is_test else "train"}/{network}/load_p.csv'
-        # self.load_q_filepath = root_path + f'/data/{"test" if is_test else "train"}/{network}/load_q.csv'
         self.load_bus = np.nonzero(self.ppc['bus'][:, PD])[0].tolist()
+        root_path = os.path.dirname(os.path.abspath(__file__))
+        self.deterministic = deterministic
 
-        # self.load_p_profiles = pd.read_csv(self.load_p_filepath).values
-        # self.load_q_profiles = pd.read_csv(self.load_q_filepath).values
-        self.load_path = root_path + f'/data/{"test" if is_test else "train"}/load.npy'
-        self.load_profiles = np.load(self.load_path)
-        self.solar_path = root_path + f'/data/{"test" if is_test else "train"}/solar.npy'
-        self.solar_profiles = np.load(self.solar_path)
-        self.wind_path = root_path + f'/data/{"test" if is_test else "train"}/wind.npy'
-        self.wind_profiles = np.load(self.wind_path)
-        self.num_sample = self.load_profiles.shape[0]
-        area_codes, areas = pd.factorize(self.ppc['bus'][:, BUS_AREA].tolist())
-        self.bus_areas = random.sample(list([i for i in range(self.load_profiles.shape[1])]), len(areas))
-        self.bus_areas = np.asarray([self.bus_areas[i] for i in area_codes.tolist()])
-        self.ori_ppc = copy.deepcopy(self.ppc)
-        self.renewable_masks = np.asarray([int(random.random() > 0.5) for _ in range(len(self.ppc['renewable_ids']))])     # 0-solar, 1-wind
         self.last_load_noises = np.ones(self.ppc['num_bus'])[self.load_bus]
         self.last_renewable_noises = np.ones(len(self.ppc['renewable_ids']))
+        if deterministic:
+            self.load_p_filepath = root_path + f'/data/{"test" if is_test else "train"}/{self.network}/load_p.csv'
+            self.load_q_filepath = root_path + f'/data/{"test" if is_test else "train"}/{self.network}/load_q.csv'
+            self.load_p_profiles = pd.read_csv(self.load_p_filepath).values
+            self.load_q_profiles = pd.read_csv(self.load_q_filepath).values
+            self.forecast_reader = ForecastReader(self.ppc, is_test=is_test)
+            self.num_sample = self.load_p_profiles.shape[0]
+            self.bus_areas = None
+        else:
+            self.load_path = root_path + f'/data/{"test" if is_test else "train"}/load.npy'
+            self.load_profiles = np.load(self.load_path)
+            self.solar_path = root_path + f'/data/{"test" if is_test else "train"}/solar.npy'
+            self.solar_profiles = np.load(self.solar_path)
+            self.wind_path = root_path + f'/data/{"test" if is_test else "train"}/wind.npy'
+            self.wind_profiles = np.load(self.wind_path)
+            self.num_sample = self.load_profiles.shape[0]
+            area_codes, areas = pd.factorize(self.ppc['bus'][:, BUS_AREA].tolist())
+            self.bus_areas = random.sample(list([i for i in range(self.load_profiles.shape[1])]), len(areas))
+            self.bus_areas = np.asarray([self.bus_areas[i] for i in area_codes.tolist()])
+            self.ori_ppc = copy.deepcopy(self.ppc)
+            self.renewable_masks = np.asarray([int(random.random() > 0.5) for _ in range(len(self.ppc['renewable_ids']))])     # 0-solar, 1-wind
+            self.forecast_reader = ForecastReader(self.ppc, self.bus_areas, self.renewable_masks, is_test=is_test)
 
-        self.forecast_reader = ForecastReader(self.ppc, self.bus_areas, self.renewable_masks, is_test=is_test)
+
 
 
     def reset_attr(self):
@@ -93,14 +99,12 @@ class Environment:
 
 
     def readdata(self, scenario_idx):
-        # self.ppc['bus'][self.load_bus, PD] = self.load_p_profiles[scenario_idx]
-        try:
+        if self.deterministic:
+            self.ppc['bus'][self.load_bus, PD] = self.load_p_profiles[scenario_idx]
+            self.ppc['bus'][self.load_bus, QD] = self.load_q_profiles[scenario_idx]
+        else:
             self.ppc['bus'][self.load_bus, PD] = self.ori_ppc['bus'][self.load_bus, PD] * self.load_profiles[scenario_idx, self.bus_areas[self.load_bus]] * self.last_load_noises
-        except:
-            import ipdb
-            ipdb.set_trace()
-        # self.ppc['bus'][self.load_bus, QD] = self.load_q_profiles[scenario_idx]
-        self.ppc['bus'][self.load_bus, QD] = self.ori_ppc['bus'][self.load_bus, QD] * self.load_profiles[scenario_idx, self.bus_areas[self.load_bus]] * self.last_load_noises
+            self.ppc['bus'][self.load_bus, QD] = self.ori_ppc['bus'][self.load_bus, QD] * self.load_profiles[scenario_idx, self.bus_areas[self.load_bus]] * self.last_load_noises
 
     def run_uopf(self):
         open_hot = np.zeros(self.ppc['num_gen'] + 1)
@@ -216,11 +220,7 @@ class Environment:
             # else:
             #     self.ppc['gen'][i, [GEN_STATUS, PMIN, PMAX]] = 0.0
 
-        # try:
         self.ppc = self.run_uopf()
-        # except:
-        #     import ipdb
-        #     ipdb.set_trace()
         # print(f'lower than min={np.where(self.ppc["gen"][:, PG]<self.ppc["gen"][:, PMIN])}')
         # print(f'larger than max={np.where(self.ppc["gen"][:, PG]>self.ppc["gen"][:, PMAX])}')
         self.ppc['gen'][:, PG] = self.ppc['gen'][:, PG].clip(self.ppc['gen'][:, PMIN], self.ppc['gen'][:, PMAX])
@@ -262,8 +262,8 @@ class Environment:
             # ppc['bus'][:, VA] = 0.0
             result, success = runpf(ppc, ppopt, fname=f'pf_{self.network}.log')
             print(f'----------------------ACPF failed in {self.network}--------------------')
-            import ipdb
-            ipdb.set_trace()
+            # import ipdb
+            # ipdb.set_trace()
         if self.ppc['gen'][self.ppc["balanced_id"], PG] > self.ppc["max_gen_p"][self.ppc["balanced_id"]] or \
                 self.ppc['gen'][self.ppc['balanced_id'], PG] < self.ppc['min_gen_p'][self.ppc['balanced_id']]:
             # import ipdb
@@ -393,7 +393,7 @@ class Environment:
         timestep += 1
 
         # Examine if exceeding historical scenarios limit
-        if sample_idx >= self.load_profiles.shape[0] - 288:
+        if sample_idx >= self.num_sample - 288:
             self.done = True
             return self.return_res('Exceeding sample limit', self.done)
 
@@ -545,7 +545,7 @@ class Environment:
         self.timestep += 1
 
         # Examine if exceeding historical scenarios limit
-        if self.sample_idx >= self.load_profiles.shape[0] - 288:
+        if self.sample_idx >= self.num_sample - 288:
             self.done = True
             return self.return_res('Exceeding sample limit', self.done)
 
