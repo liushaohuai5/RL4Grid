@@ -9,9 +9,9 @@ class GridSimWrapper:
         self.last_obs = None
         self.step_cnt = 0
 
-    def step(self, action):
+    def step(self, action, ppc=None):
         action = {'adjust_gen_p': action, 'adjust_gen_v': np.zeros_like(action)}
-        observation, reward, done, info = self.env.step(action)
+        observation, reward, done, info = self.env.step(action, ppc=ppc)
         self.step_cnt += 1
         self.last_obs = copy.deepcopy(observation)
         return observation, reward, done, info
@@ -36,9 +36,9 @@ class GridSimWrapper:
         sample_idx = self.env.sample_idx
         return (observation, sample_idx)
 
-    def reset(self, ori_obs=False, start_sample_idx=None, seed=0):
+    def reset(self, ori_obs=False, start_sample_idx=None, seed=0, ppc=None):
         self.step_cnt = 0
-        observation = self.env.reset(start_sample_idx=start_sample_idx)
+        observation = self.env.reset(start_sample_idx=start_sample_idx, ppc=ppc)
         self.last_obs = copy.deepcopy(observation)
         return observation
 

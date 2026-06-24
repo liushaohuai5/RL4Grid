@@ -135,7 +135,7 @@ def rerun_opf(observation, ppc):
     ppc['gen'][:, GEN_STATUS] = gen_status  # status
 
     bal_gen_p_mid = (ppc['min_gen_p'][ppc['balanced_id']] + ppc['max_gen_p'][ppc['balanced_id']]) / 2
-    redundancy = (ppc['max_gen_p'][ppc['balanced_id']] - ppc['min_gen_p'][ppc['balanced_id']]) / 2 * 0.8
+    redundancy = (ppc['max_gen_p'][ppc['balanced_id']] - ppc['min_gen_p'][ppc['balanced_id']]) / 2 * 0.6
 
     gen_p_upper = np.asarray(observation.gen_p) + observation.action_space['adjust_gen_p'].high
     gen_p_lower = np.maximum(np.asarray(observation.gen_p) + observation.action_space['adjust_gen_p'].low, ppc['min_gen_p'])
@@ -145,7 +145,7 @@ def rerun_opf(observation, ppc):
     # ppc['gen'][:, PMAX] = ppc['max_gen_p']
     ppc['gen'][ppc['balanced_id'], PMAX] = bal_gen_p_mid + redundancy
     ppc['gen'][close_ids, PMAX] = 0
-    ratio = 0.98
+    ratio = 0.9
     ppc['gen'][ppc['renewable_ids'], PMAX] = np.array(observation.nextstep_renewable_gen_p_max) * ratio
     ppc['gen'][:, PMIN] = gen_p_lower
     # ppc['gen'][:, PMIN] = ppc['min_gen_p']
@@ -155,6 +155,16 @@ def rerun_opf(observation, ppc):
     ppc['gen'][ppc['balanced_id'], PMIN] = bal_gen_p_mid - redundancy
     ppc['gen'][close_ids, PMIN] = 0
 
+    bal_diff = 0
+    if ppc['gen'][ppc['balanced_id'], PG] < ppc['gen'][ppc['balanced_id'], PMIN]:
+        bal_diff = ppc['gen'][ppc['balanced_id'], PMIN] - ppc['gen'][ppc['balanced_id'], PG]
+    if ppc['gen'][ppc['balanced_id'], PG] > ppc['gen'][ppc['balanced_id'], PMAX]:
+        bal_diff = ppc['gen'][ppc['balanced_id'], PMAX] - ppc['gen'][ppc['balanced_id'], PG]
+
+    load_p = load_p - (bal_diff / len(load_p))
+    ppc['bus'][:, PD] = np.matmul(load_p, ld2busM)  # Pd
+
+
     result, open_hot, close_hot = run_uopf(ppc)
     result['gen'][:, PG] = result['gen'][:, PG].clip(ppc['gen'][:, PMIN], ppc['gen'][:, PMAX])
     new_gen_p = copy.deepcopy(result['gen'][:, PG])
@@ -163,13 +173,7 @@ def rerun_opf(observation, ppc):
     return new_gen_p, recover_ids, close_ids, result
 
 
-
-
-
-
-network_ppc = {'IEEE39': case39()}
-env = RL4Grid.make_gridsim(network_ppc=network_ppc)
-
+# datacenter's influence on LMP, Tariff project
 # cases = [
 #     # bus_num, injected_load
 #     [1636, 1000],   # case 1, houston connected 1GW
@@ -189,53 +193,110 @@ env = RL4Grid.make_gridsim(network_ppc=network_ppc)
 # import ipdb
 # ipdb.set_trace()
 
-ppc_lst = []
-target_dones = 0
-for i in range(0, 35132):
-    # i = 35132//2
-    # i = 6660
-    # i = 28193
-    obs = env.reset(start_sample_idx=i)
-    action_high = obs.action_space['adjust_gen_p'].high
-    action_low = obs.action_space['adjust_gen_p'].low
-    ppc = copy.deepcopy(env.env.ppc)
-    new_gen_p, _, _, result = rerun_opf(obs, ppc)
-    if not result['success']:
-        continue
-    best_a = new_gen_p - np.asarray(obs.gen_p)
-    best_a = best_a.clip(action_low, action_high)
-    # import ipdb
-    # ipdb.set_trace()
-    # prev_p = copy.deepcopy(obs.gen_p)
-    # adjust_gen_v = np.zeros(ppc['num_gen'])
-    # adjust_gen_v = adjust_gen_v.clip(obs.action_spastepce['adjust_gen_v'].low, obs.action_space['adjust_gen_v'].high)
-    # _, best_reward, target_done, info = env.step({'adjust_gen_p': best_a, 'adjust_gen_v': adjust_gen_v})
-    _, best_reward, target_done, info = env.step(best_a)
-    # env.env.visualizer.plot(env.env.ppc, save_path=f'./figs/{env.env.ppc["network"]}', step=i)
-    if target_done:
-        mismatch_ids = np.where(np.abs(new_gen_p - env.env.ppc['gen'][:, PG])>1)[0].tolist()
-        for idx in mismatch_ids:
-            print(f'scenario={i}, gen_idx={idx}, gen_bus={env.env.ppc["gen"][idx, GEN_BUS]}, is_renewable={idx in env.env.ppc["renewable_ids"]}, is_thermal={idx in env.env.ppc["thermal_ids"]}, '
-                  f'is_balanced={idx == env.env.ppc["balanced_id"]}, prev_p={new_gen_p[idx]}, now_gen_p={env.env.ppc["gen"][idx, PG]}')
-        print(f'target done, {info}')
-        target_dones += 1
-    else:
-        ppc_dict = {}
-        ppc_dict['bus'] = env.env.ppc['bus']
-        ppc_dict['branch'] = env.env.ppc['branch']
-        ppc_dict['gen'] = env.env.ppc['gen']
-        ppc_dict['target_gen_p'] = new_gen_p
-        ppc_dict['index'] = i
-        ppc_lst.append(ppc_dict)
-        if i % 100 == 0:
-            print("********************************************")
-            print(f'{i}, network={network}, target_dones={target_dones}')
-            print("--------------------------------------------")
 
-import pickle
-filehandler = open(f"ppc_lst_{network}.pkl", "wb")
-pickle.dump(ppc_lst, filehandler)
-filehandler = open(f'ppc_lst_{network}.pkl', "rb")
-data = pickle.load(filehandler)
+
+ppc_dict = {
+    # 'IEEE14': case14(),
+    # 'IEEE39': case39(),
+    # 'IEEE57': case57(),
+    # 'SG126': case126(),
+    # 'IEEE300': case300(),
+    # 'Texas2000': case2000(),
+    'WE10000': case10000()
+
+    # "PGLib60": case60_c(),      # TODO: need further debugging
+    # "PGLib73": case73_ieee_rts(),
+    # "PGLib89": case89_pegase(),
+    # 'PGLib197': case197_snem(),
+
+
+    # 'PGLib179': case179_goc(),      # TODO: need further debugging
+    # 'PGLib500': case500_goc(),
+    # 'PGLib793': case793_goc(),
+    # 'PGLib2000': case2000_goc(),    # TODO: need long-term verification
+    # 'PGLib2312': case2312_goc(),    # TODO: need long-term verification
+    # "PGLib2742": case2742_goc(),
+    # 'PGLib3022': case3022_goc(),    # TODO: need further debugging
+    # 'PGLib3970': case3970_goc(),
+    # 'PGLib4020': case4020_goc(),
+    # 'PGLib4601': case4601_goc(),
+    # 'PGLib4619': case4619_goc(),
+    # 'PGLib4837': case4837_goc(),
+    # 'PGLib4917': case4917_goc(),    # TODO: need further debugging
+    # 'PGLib9591': case9591_goc(),
+    # 'PGLib10000': case10000_goc(),
+    # 'PGLib10480': case10480_goc(),
+    # 'PGLib19402': case19402_goc(),
+    # 'PGLib24464': case24464_goc(),    # TODO: need further debugging
+    # 'PGLib30000': case30000_goc(),
+    # 'PGLib78484': case78484_epigrids(),
+}
+
+# ppc_lsts = {}
+# root_path = '/mnt/shared-scratch/Xie_L/lin.dong/LLM4Power/QA_Discretization'
+# import pickle
+# for network in ppc_dict.keys():
+#     with open(f"{root_path}/ppc_lst_{network}.pkl", "rb") as file:
+#         ppc_lsts[network] = pickle.load(file)
+
+for network, ppc in ppc_dict.items():
+    env = RL4Grid.make_gridsim(network_ppc={network: ppc}, deterministic=False)
+    ppc_lst = []
+    target_dones = 0
+    start_idx = 22
+    for i in range(start_idx, 35132):
+        x = time.time()
+        obs = env.reset(start_sample_idx=i)
+        # obs = env.reset(ppc=ppc_lsts[network][i])
+        reset_time = time.time() - x
+        action_high = obs.action_space['adjust_gen_p'].high
+        action_low = obs.action_space['adjust_gen_p'].low
+        ppc = copy.deepcopy(env.env.ppc)
+        x = time.time()
+        new_gen_p, _, _, result = rerun_opf(obs, ppc)
+        opf_time = time.time() - x
+        if not result['success']:
+            continue
+        best_a = new_gen_p - np.asarray(obs.gen_p)
+        best_a = best_a.clip(action_low, action_high)
+        x = time.time()
+        _, best_reward, target_done, info = env.step(best_a)
+        step_time = time.time() - x
+        # env.env.visualizer.plot(env.env.ppc, save_path=f'./figs/{env.env.ppc["network"]}', step=i)
+        # print(f'total load={obs.load_p.sum():.3f}, total gen_p={(obs.gen_p + best_a).sum():.3f}')
+        # import ipdb
+        # ipdb.set_trace()
+        if target_done:
+            mismatch_ids = np.where(np.abs(new_gen_p - env.env.ppc['gen'][:, PG])>1)[0].tolist()
+            for idx in mismatch_ids:
+                print(f'scenario={i}, gen_idx={idx}, gen_bus={env.env.ppc["gen"][idx, GEN_BUS]}, is_renewable={idx in env.env.ppc["renewable_ids"]}, is_thermal={idx in env.env.ppc["thermal_ids"]}, '
+                      f'is_balanced={idx == env.env.ppc["balanced_id"]}, prev_p={new_gen_p[idx]}, now_gen_p={env.env.ppc["gen"][idx, PG]}')
+            print(f'target done, {info}')
+            import ipdb
+            ipdb.set_trace()
+            target_dones += 1
+        else:
+            ppc_dict = {}
+            ppc_dict['bus'] = env.env.ppc['bus']
+            ppc_dict['branch'] = env.env.ppc['branch']
+            ppc_dict['gen'] = env.env.ppc['gen']
+            ppc_dict['target_gen_p'] = new_gen_p
+            ppc_dict['curstep_renewable_gen_p_max'] = obs.curstep_renewable_gen_p_max
+            ppc_dict['nextstep_renewable_gen_p_max'] = obs.nextstep_renewable_gen_p_max
+            ppc_dict['nextstep_load_p'] = obs.nextstep_load_p
+            ppc_dict['index'] = i
+            ppc_lst.append(ppc_dict)
+            if i % 100 == 0:
+                print("********************************************")
+                print(f'{i}, network={network}, target_dones={target_dones}')
+                print("--------------------------------------------")
+            print(f'network={network}, step={i}, reset_time={reset_time:.3f}, opf_time={opf_time:.3f}, step_time={step_time:.3f}')
+
+    import pickle
+    filehandler = open(f"ppc_lst_{network}.pkl", "wb")
+    pickle.dump(ppc_lst, filehandler)
+    # filehandler = open(f'ppc_lst_{network}.pkl', "rb")
+    # data = pickle.load(filehandler)
+
 import ipdb
 ipdb.set_trace()

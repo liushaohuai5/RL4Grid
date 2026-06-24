@@ -42,7 +42,13 @@ def case89_pegase():
     # 2 startup shutdown n c(n-1) ... c0
     ppc["gencost"] = np.load(path+"case89_pegase_gencost.npy")
 
-    ppc["network"] = case89_pegase
+    # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(1e2, 1e8)
+    sensitive_line_idxs = [94, 33]
+    suggested_capacities = [1603, 519]
+    for i, idx in enumerate(sensitive_line_idxs):
+        ppc['branch'][idx, [RATE_A, RATE_B, RATE_C]] = suggested_capacities[i]
+
+    ppc["network"] = "case89_pegase"
     ppc["num_bus"] = ppc["bus"].shape[0]
     bus_gen = [[] for _ in range(ppc["num_bus"])]
     for i, bus in enumerate(ppc["gen"][:, GEN_BUS].tolist()):
@@ -83,7 +89,7 @@ def case89_pegase():
     if ppc["balanced_id"] != ppc["gen"][:, PMAX].argmax():
         ppc["gen"][ppc["balanced_id"], PMAX] = ppc["gen"][ppc["gen"][:, PMAX].argmax(), PMAX]
 
-    ppc["gen"][ppc["balanced_id"], PMAX] *= 3
+    ppc["gen"][ppc["balanced_id"], PMAX] *= 1
     ppc["gen"][ppc["balanced_id"], QMIN] = -ppc["gen"][ppc["balanced_id"], QMAX]
 
     ppc["min_gen_p"] = ppc["gen"][:, PMIN].tolist()

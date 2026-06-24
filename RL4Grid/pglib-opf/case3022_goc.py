@@ -42,7 +42,26 @@ def case3022_goc():
     # 2 startup shutdown n c(n-1) ... c0
     ppc["gencost"] = np.load(path+"case3022_goc_gencost.npy")
 
-    ppc["network"] = case3022_goc
+    ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(1e2, 1e8)
+    # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] *= 1.5
+    sensitive_line_idxs = [4114, 2669, 2372, 2254, 2093, 1254, 2439, 2437, 2410, 2461, 1544, 1308, 129, 130, 323,
+                           1224, 1189, 1078, 1985, 2320, 71, 95, 120, 279, 378, 471, 472, 1115, 1264, 1413, 1936, 1965,
+                           1984, 2060, 2292, 2342, 2410, 2461, 2782, 2806, 2807, 3524, 3560, 386, 1544, 1308, 68, 129,
+                           130, 432, 485, 1055, 1078, 1224, 1412, 1612, 1859, 2320, 2439, 2463, 2645, 2963, 3530,
+                           3856, 3867, 3879, 378, 460, 1677, 1860, 1937, 2040, 2437, 2456, 2632, 2755, 2780, 2807, 3878,
+                           95, 262, 323, 489, 1024, 1473, 1586, 1847, 1905, 1973, 1985, 2087, 2319, 2693, 2806, 2669,
+                           2235]
+    suggested_capacities = [250, 200, 150, 250, 200, 200, 150, 150, 200, 200, 150, 150, 700, 700, 200, 650, 150, 200,
+                            150, 250, 150.0, 342.0, 174.0, 1230.0, 361.5, 859.5, 150.0, 280.5, 833.04, 150.0, 150.0,
+                            150.0, 150.0, 715.5, 244.5, 150.0, 300.0, 300.0, 436, 264.0, 150.0, 579.0, 812, 577.5,
+                            250, 250, 205.5, 1050.0, 1050.0, 216.0, 226.5, 171.0, 300.0, 975.0, 150.0, 225.0, 150.0,
+                            375.0, 225.0, 267.0, 370.08, 390.0, 732.66, 354.75, 577.5, 216, 542.25, 619.5, 150.0, 150.0,
+                            150.0, 244.5, 225.0, 301.5, 449, 555.0, 604.5, 225.0, 216, 513.0, 333.0, 300.0, 178.305,
+                            150.0, 150.0, 569.46, 150.0, 218, 150.0, 225.0, 295.695, 150.0, 425.355, 396.0, 300, 150]
+    for i, idx in enumerate(sensitive_line_idxs):
+        ppc['branch'][idx, [RATE_A, RATE_B, RATE_C]] = suggested_capacities[i]
+
+    ppc["network"] = "case3022_goc"
     ppc["num_bus"] = ppc["bus"].shape[0]
     bus_gen = [[] for _ in range(ppc["num_bus"])]
     for i, bus in enumerate(ppc["gen"][:, GEN_BUS].tolist()):
@@ -54,10 +73,7 @@ def case3022_goc():
             g1 = bg[0]
             for g2 in bg:
                 if g2 != g1:
-                    ppc["gen"][g1, [PG, QG, QMAX, QMIN, PMAX, PMIN, PC1, PC2, QC1MIN, QC1MAX, QC2MIN, QC2MAX, RAMP_AGC, RAMP_10,
-                                    RAMP_30, RAMP_Q]]                         += ppc["gen"][
-                        g2, [PG, QG, QMAX, QMIN, PMAX, PMIN, PC1, PC2, QC1MIN, QC1MAX, QC2MIN, QC2MAX, RAMP_AGC, RAMP_10,
-                             RAMP_30, RAMP_Q]]
+                    ppc["gen"][g1, [PG, QG, QMAX, QMIN, PMAX, PMIN]] += ppc["gen"][g2, [PG, QG, QMAX, QMIN, PMAX, PMIN]]
                     del_rows.append(g2)
     ppc["gen"] = np.delete(ppc["gen"], del_rows, axis=0)
     ppc["gencost"] = np.delete(ppc["gencost"], del_rows, axis=0)

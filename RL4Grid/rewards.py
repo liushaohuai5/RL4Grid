@@ -1,5 +1,5 @@
 import math
-
+import numpy as np
 
 def line_over_flow_reward(obs, ppc):
     r = 1 - sum([min(i, 1) for i in obs.rho])/ppc['num_line']
@@ -152,6 +152,9 @@ def EPRIReward(obs, last_obs, ppc):
         ppc['coeff_sub_voltage'] * sub_voltage_reward(obs, ppc) + \
         ppc['coeff_gen_reactive_power'] * gen_reactive_power_reward(obs, ppc) + \
         ppc['coeff_running_cost'] * running_cost_reward(obs, last_obs, ppc)
+    if abs(r) > 100:
+        import ipdb
+        ipdb.set_trace()
     return r
 
 

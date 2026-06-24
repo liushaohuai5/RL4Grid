@@ -42,7 +42,13 @@ def case4917_goc():
     # 2 startup shutdown n c(n-1) ... c0
     ppc["gencost"] = np.load(path+"case4917_goc_gencost.npy")
 
-    ppc["network"] = case4917_goc
+    # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(50, 1e8)
+    sensitive_line_idxs = []
+    suggested_capacities = []
+    for i, idx in enumerate(sensitive_line_idxs):
+        ppc['branch'][idx, [RATE_A, RATE_B, RATE_C]] = suggested_capacities[i]
+
+    ppc["network"] = "case4917_goc"
     ppc["num_bus"] = ppc["bus"].shape[0]
     bus_gen = [[] for _ in range(ppc["num_bus"])]
     for i, bus in enumerate(ppc["gen"][:, GEN_BUS].tolist()):
@@ -54,10 +60,7 @@ def case4917_goc():
             g1 = bg[0]
             for g2 in bg:
                 if g2 != g1:
-                    ppc["gen"][g1, [PG, QG, QMAX, QMIN, PMAX, PMIN, PC1, PC2, QC1MIN, QC1MAX, QC2MIN, QC2MAX, RAMP_AGC, RAMP_10,
-                                    RAMP_30, RAMP_Q]]                         += ppc["gen"][
-                        g2, [PG, QG, QMAX, QMIN, PMAX, PMIN, PC1, PC2, QC1MIN, QC1MAX, QC2MIN, QC2MAX, RAMP_AGC, RAMP_10,
-                             RAMP_30, RAMP_Q]]
+                    ppc["gen"][g1, [PG, QG, QMAX, QMIN, PMAX, PMIN]] += ppc["gen"][g2, [PG, QG, QMAX, QMIN, PMAX, PMIN]]
                     del_rows.append(g2)
     ppc["gen"] = np.delete(ppc["gen"], del_rows, axis=0)
     ppc["gencost"] = np.delete(ppc["gencost"], del_rows, axis=0)

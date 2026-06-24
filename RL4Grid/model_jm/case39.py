@@ -225,6 +225,12 @@ def case39():
 
     ppc['bus'][:, BUS_AREA] = 1
 
+    # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(1e2, 1e8)
+    sensitive_line_idxs = [2]
+    suggested_capacities = [700]
+    for i, idx in enumerate(sensitive_line_idxs):
+        ppc['branch'][idx, [RATE_A, RATE_B, RATE_C]] = suggested_capacities[i]
+
     ppc['network'] = 'IEEE39'
     ppc['num_gen'] = ppc['gen'].shape[0]
     ppc['num_bus'] = ppc['bus'].shape[0]

@@ -6,6 +6,7 @@ class Disconnect(object):
         self.lines = [i for i in range(ppc['num_line'])]
 
         self.prob_dis = ppc['prob_disconnection']
+        # self.prob_dis = 1.0     # N-1 enabled
         self.white_list = ppc['white_list_random_disconnection']
         self.hard_bound = ppc['hard_overflow_bound']
         self.soft_bound = ppc['soft_overflow_bound']

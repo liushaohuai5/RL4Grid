@@ -42,7 +42,13 @@ def case60_c():
     # 2 startup shutdown n c(n-1) ... c0
     ppc["gencost"] = np.load(path+"case60_c_gencost.npy")
 
-    ppc["network"] = case60_c
+    # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(1e2, 1e8)
+    sensitive_line_idxs = [71, 45, 44, 51, 62, 43]
+    suggested_capacities = [2000, 1200, 1200, 1200, 800, 1200]
+    for i, idx in enumerate(sensitive_line_idxs):
+        ppc['branch'][idx, [RATE_A, RATE_B, RATE_C]] = suggested_capacities[i]
+
+    ppc["network"] = "case60_c"
     ppc["num_bus"] = ppc["bus"].shape[0]
     bus_gen = [[] for _ in range(ppc["num_bus"])]
     for i, bus in enumerate(ppc["gen"][:, GEN_BUS].tolist()):

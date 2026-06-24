@@ -42,7 +42,13 @@ def case73_ieee_rts():
     # 2 startup shutdown n c(n-1) ... c0
     ppc["gencost"] = np.load(path+"case73_ieee_rts_gencost.npy")
 
-    ppc["network"] = case73_ieee_rts
+    # ppc['branch'][:, [RATE_A, RATE_B, RATE_C]] = ppc['branch'][:, [RATE_A, RATE_B, RATE_C]].clip(1e2, 1e8)
+    sensitive_line_idxs = []
+    suggested_capacities = []
+    for i, idx in enumerate(sensitive_line_idxs):
+        ppc['branch'][idx, [RATE_A, RATE_B, RATE_C]] = suggested_capacities[i]
+
+    ppc["network"] = "case73_ieee_rts"
     ppc["num_bus"] = ppc["bus"].shape[0]
     bus_gen = [[] for _ in range(ppc["num_bus"])]
     for i, bus in enumerate(ppc["gen"][:, GEN_BUS].tolist()):

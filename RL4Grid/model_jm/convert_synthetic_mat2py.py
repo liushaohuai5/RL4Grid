@@ -13,72 +13,6 @@ from pathlib import Path
 from datetime import date
 import tempfile
 
-# def upsert_tail_block(file_path, tag, lines, encoding="utf-8"):
-#     p = Path(file_path)
-#     if not p.exists():
-#         raise FileNotFoundError(p)
-#
-#     start_marker = f"# <<< {tag} START >>>\n"
-#     end_marker   = f"# <<< {tag} END >>>\n"
-#
-#     text = p.read_text(encoding=encoding)
-#
-#     if not text.endswith("\n"):
-#         text += "\n"
-#
-#     block_body = "".join(line if line.endswith("\n") else line + "\n" for line in lines)
-#     block = f"{start_marker}{block_body}{end_marker}"
-#
-#     s = text.rfind(start_marker)
-#     e = text.rfind(end_marker)
-#     if s != -1 and e != -1 and s < e:
-#         new_text = text[:s] + block + text[e + len(end_marker):]
-#     else:
-#         if not text.endswith("\n\n"):
-#             text += "\n"
-#         new_text = text + block
-#
-#     with tempfile.NamedTemporaryFile("w", encoding=encoding, newline="", delete=False) as tmp:
-#         tmp.write(new_text)
-#         tmp_path = tmp.name
-#     os.replace(tmp_path, p)
-#
-# pypower_path = Path(os.path.dirname(pypower.__file__))
-# target = pypower_path / "api.py"
-# new_lines = []
-#
-# folder = Path(os.path.dirname(os.getcwd())+'/pglib-opf/')
-# paths = sorted(str(p.resolve()) for p in folder.glob("*.py"))
-#
-# cnt = 0
-# for path in paths:
-#     network = path.split('/')[-1].split('.py')[0]
-#     new_lines.append(f"from .{network} import {network}")
-#
-# upsert_tail_block(
-#     target,
-#     tag="AUTOAPPEND",
-#     lines=new_lines
-# )
-# import ipdb
-# ipdb.set_trace()
-
-# train_idx = 4*24*365*3
-# test_idx = 4*24*365*4
-# load = pd.read_csv('C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/data/load.csv')
-# norm_load = (load.values - load.values.min(0)) / (load.values.max(0) - load.values.min(0) + 1e-3) * 0.9 + 0.3   # 0.3 - 1.2
-# np.save('C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/data/train/load.npy', norm_load[:train_idx])
-# np.save('C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/data/test/load.npy', norm_load[train_idx:test_idx])
-# solar = pd.read_csv('C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/data/solar.csv')
-# norm_solar = (solar.values - solar.values.min(0)) / (solar.values.max(0) - solar.values.min(0) + 1e-3) * 1.4 + 0.1  # 0.1 - 1.5
-# np.save('C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/data/train/solar.npy', norm_solar[:train_idx])
-# np.save('C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/data/test/solar.npy', norm_solar[train_idx:test_idx])
-# wind = pd.read_csv('C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/data/wind.csv')
-# norm_wind = (wind.values - wind.values.min(0)) / (wind.values.max(0) - wind.values.min(0) + 1e-3) * 1.4 + 0.1   # 0.1 - 1.5
-# np.save('C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/data/train/wind.npy', norm_wind[:train_idx])
-# np.save('C:/Users/sh-li/Downloads/RL4Grid/RL4Grid/data/test/wind.npy', norm_wind[train_idx:test_idx])
-# import ipdb
-# ipdb.set_trace()
 
 def extract_floats(s):
     # pattern = r"-?\d+(?:\.\d+)?"
@@ -87,10 +21,6 @@ def extract_floats(s):
     float_numbers = [float(num) for num in float_numbers]
     return np.asarray(float_numbers)
 
-# bus_arrays = []
-# gen_arrays = []
-# branch_arrays = []
-# gencost_arrays = []
 
 network = 'TX2000'   # TX2000 or WE10000
 paths = [
